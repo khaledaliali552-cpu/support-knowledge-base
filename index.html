@@ -41,7 +41,7 @@
     --font-ar:'IBM Plex Sans Arabic','Segoe UI',Tahoma,sans-serif;
   }
   *{box-sizing:border-box;}
-  html,body{height:100%;}
+  html,body{height:100%;overflow-x:hidden;}
   body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text);
        -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.6;}
   html[dir="rtl"] body{font-family:var(--font-ar);}
@@ -334,6 +334,7 @@
     .sidebar{position:fixed;left:0;top:0;z-index:150;transform:translateX(-100%);transition:transform .2s ease;}
     html[dir="rtl"] .sidebar{left:auto;right:0;transform:translateX(100%);}
     .sidebar.open{transform:translateX(0);}
+    html[dir="rtl"] .sidebar.open{transform:translateX(0);}
     .main{padding:20px 16px 50px;}
     .stat-grid{grid-template-columns:1fr 1fr;}
     .two-col,.form-grid{grid-template-columns:1fr;}
@@ -1486,12 +1487,13 @@ function runSearch(query){
   if(!scored.length) return {query,best:null,others:[]};
   return {query,best:scored[0].item,others:scored.slice(1,4).map(s=>s.item)};
 }
-function logSearch(query,item){
+function logSearch(query,item,titleOverride){
   const row = {
     id:nextId("h"), query, date:todayStr(), time:nowTimeStr(),
-    category:item?item.category:"—", team:item?(item.responsibleTeam||"—"):"—",
+    category:item?item.category:(titleOverride?"Trading":"—"),
+    team:item?(item.responsibleTeam||"—"):(titleOverride?"Financial Department":"—"),
     resultId:item?item.id:null,
-    resultTitle:item?(C(item,'title')):null,
+    resultTitle:item?(C(item,'title')):(titleOverride||null),
     agent:state.session?state.session.name:"—"
   };
   searchHistory.unshift(row);
