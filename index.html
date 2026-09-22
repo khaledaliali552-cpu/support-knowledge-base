@@ -249,6 +249,8 @@
   .bar-count{font-size:12px;color:var(--text-muted);width:26px;text-align:end;}
 
   table{width:100%;border-collapse:collapse;font-size:13px;}
+  .kb-row-clickable{cursor:pointer;}
+  .kb-row-clickable:hover{background:var(--primary-soft);}
   th{text-align:start;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);
     padding:11px 14px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap;}
   td{padding:13px 14px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-2);}
@@ -869,6 +871,7 @@ en:{
   appName:"Support Knowledge Base", appSub:"Internal Support Tool",
   workspace:"Workspace", administration:"Administration",
   navSearch:"Search", navFavorites:"Favorites", navHistory:"History",
+  back:"Back",
   navDashboard:"Dashboard", navKnowledge:"Knowledge Base", navQuality:"Quality", navUsers:"Users",
   navCategories:"Categories", navTeams:"Teams", navSearchHistory:"Search History",
   navMissing:"Missing Knowledge", navStatistics:"Statistics", navSettings:"Settings",
@@ -1040,6 +1043,7 @@ ar:{
   appName:"قاعدة معرفة الدعم", appSub:"أداة الدعم الداخلية",
   workspace:"مساحة العمل", administration:"الإدارة",
   navSearch:"البحث", navFavorites:"المفضلة", navHistory:"السجل",
+  back:"رجوع",
   navDashboard:"لوحة المعلومات", navKnowledge:"قاعدة المعرفة", navQuality:"الجودة", navUsers:"المستخدمون",
   navCategories:"التصنيفات", navTeams:"الفرق", navSearchHistory:"سجل البحث",
   navMissing:"المعرفة الناقصة", navStatistics:"الإحصائيات", navSettings:"الإعدادات",
@@ -1250,7 +1254,7 @@ function roleLabel(r){ return r==='admin'?t('roleAdmin'):t('roleEmployee'); }
 const PERMISSIONS = {
   admin:    ["search","favorites","history","qualityerrors","dashboard","knowledge","quality",
              "users","categories","teams","searchhistory","missing","statistics","settings"],
-  employee: ["search","favorites","history","qualityerrors"]
+  employee: ["search","favorites","history","qualityerrors","knowledge"]
 };
 const ADMIN_ONLY_ACTIONS = ["knowledge.write","quality.write","qualityerrors.write","users.write",
                             "categories.write","teams.write","types.write","settings.write","missing.write"];
@@ -1283,7 +1287,7 @@ let state = {
   lastResults:null,
   editingItemId:null, editingRuleId:null, editingUserId:null,
   historyFilter:"", errorFilter:"", loginError:"", modal:null,
-  editingErrorId:null, syncState:"local", lastSync:null
+  editingErrorId:null, syncState:"local", lastSync:null, viewingKbId:null
 };
 
 /* ========================= 4b. SHARED DATA STORE =========================
@@ -1559,6 +1563,7 @@ function renderSidebar(){
       ${item('search','🔍',t('navSearch'))}
       ${item('favorites','★',t('navFavorites'), myFavorites().length||'')}
       ${item('history','🕘',t('navHistory'))}
+      ${!isAdmin?item('knowledge','📚',t('navKnowledge')):''}
       ${!isAdmin?item('qualityerrors','⚠',t('navQualityErrors')):''}
     </div>
     ${isAdmin?`
@@ -1588,6 +1593,7 @@ function goTo(v){
   if(!can(v)){ showToast(t('accessDenied')); return; }
   state.view=v; state.editingItemId=null; state.editingRuleId=null;
   state.editingUserId=null; state.editingErrorId=null; state.errorFilter="";
+  state.viewingKbId=null;
   closeSidebarMobile(); render();
 }
 function renderView(){
@@ -1979,31 +1985,41 @@ function renderStatistics(){
 /* ============================== KNOWLEDGE BASE ============================== */
 function renderKnowledgeList(){
   if(!can('knowledge')) return '';
+  const isAdmin = state.session.role==='admin';
+  if(!isAdmin && state.viewingKbId){
+    const item = findItem(state.viewingKbId);
+    if(!item) { state.viewingKbId=null; }
+    else return `<div class="page-head"><div>
+        <button class="btn btn-ghost btn-sm" onclick="state.viewingKbId=null;render();">← ${t('back')}</button>
+      </div></div>${renderResultCard(item)}`;
+  }
   return `<div class="page-head"><div>
       <h1 class="page-title">${t('knowledgeTitle')}</h1><p class="page-sub">${t('knowledgeSub')}</p></div></div>
     <div class="info-banner">${t('knowledgeIntro')}</div>
     <div class="toolbar">
       <div class="search-mini"><span>🔍</span><input id="kbFilter" dir="auto" placeholder="${t('filterItems')}" oninput="refreshKb()"></div>
-      <button class="btn btn-primary" onclick="openAddKnowledge()">+ ${t('addKnowledge')}</button>
+      ${isAdmin?`<button class="btn btn-primary" onclick="openAddKnowledge()">+ ${t('addKnowledge')}</button>`:''}
     </div>
-    <div class="card" id="kbWrap">${kbRows(knowledgeItems)}</div>`;
+    <div class="card" id="kbWrap">${kbRows(knowledgeItems, isAdmin)}</div>`;
 }
 function refreshKb(){
   const q=normalize(document.getElementById('kbFilter').value);
   const rows=knowledgeItems.filter(it=>!q||normalize(C(it,'title')).includes(q)||
     normalize((it.en&&it.en.title)||"").includes(q)||normalize((it.ar&&it.ar.title)||"").includes(q)||
     normalize(it.category).includes(q));
-  document.getElementById('kbWrap').innerHTML=kbRows(rows);
+  document.getElementById('kbWrap').innerHTML=kbRows(rows, state.session.role==='admin');
 }
-function kbRows(rows){
+function kbRows(rows, isAdmin){
+  if(isAdmin===undefined) isAdmin = state.session.role==='admin';
   if(!rows.length) return `<div class="empty-state"><div class="icon">📚</div>${t('noItems')}</div>`;
   return `<table><thead><tr>
       <th>${t('colTitle')}</th><th>${t('colCategory')}</th><th>${t('colType')}</th>
-      <th>${t('navQuality')}</th><th>${t('colStatus')}</th><th>${t('colUpdated')}</th><th>${t('colActions')}</th>
+      <th>${t('navQuality')}</th><th>${t('colStatus')}</th><th>${t('colUpdated')}</th>
+      ${isAdmin?`<th>${t('colActions')}</th>`:''}
     </tr></thead><tbody>
     ${rows.map(it=>{
       const n=qualityRules.filter(q=>q.knowledgeId===it.id).length;
-      return `<tr>
+      return `<tr ${isAdmin?'':`class="kb-row-clickable" onclick="state.viewingKbId='${it.id}';render();"`}>
         <td dir="auto"><div style="font-weight:600;color:var(--text);">${esc(C(it,'title'))}</div>
           ${it.needsClarification?`<span class="clarify-flag" style="margin-top:4px;display:inline-block;">${t('needsClarificationFlag')}</span>`:''}</td>
         <td>${esc(it.category)}</td>
@@ -2011,11 +2027,11 @@ function kbRows(rows){
         <td>${n?`<span class="badge">${n}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
         <td><span class="badge ${it.status==='Active'?'badge-active':'badge-inactive'}">${statusLabel(it.status)}</span></td>
         <td>${esc(it.updatedAt)}</td>
-        <td class="row-actions">
+        ${isAdmin?`<td class="row-actions">
           <button class="btn btn-outline btn-sm" onclick="openEditKnowledge('${it.id}')">${t('edit')}</button>
           <button class="btn btn-ghost btn-sm" onclick="toggleKbStatus('${it.id}')">${it.status==='Active'?t('deactivate'):t('activate')}</button>
           <button class="btn btn-danger btn-sm" onclick="confirmDeleteKb('${it.id}')">${t('del')}</button>
-        </td></tr>`;}).join('')}
+        </td>`:''}</tr>`;}).join('')}
   </tbody></table>`;
 }
 function toggleKbStatus(id){
