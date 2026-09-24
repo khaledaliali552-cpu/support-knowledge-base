@@ -862,8 +862,16 @@ let favoritesByUser = {};
 let missingRequests = [];
 let settings = { defaultLanguage:"en", appName:"Support Knowledge Base" };
 
-let idCounter = 200;
-function nextId(p){ idCounter++; return p + idCounter; }
+/* IDs must stay unique across every device/session, forever — not just
+   within one page load. A simple incrementing counter (the old approach)
+   resets to the same starting number every time the page reloads, so two
+   items created in different sessions could easily end up with the exact
+   same id, silently merging them in the UI (editing one would show the
+   other's data). Timestamp + a random suffix makes a collision practically
+   impossible without needing to track any shared counter. */
+function nextId(p){
+  return p + Date.now().toString(36) + Math.random().toString(36).slice(2,9);
+}
 
 /* ============================== 2. I18N ============================== */
 const translations = {
