@@ -1,26 +1,2831 @@
--- Fixes the 3-way id collision on 'kb201'. Gives each of the 3 items its
--- own unique id (kb201_1, kb201_2, kb201_3) — nothing else about them
--- (title, content, category, status) is touched. Every other item in the
--- knowledge base is left completely untouched.
+<!DOCTYPE html>
+<html lang="en" dir="ltr" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Support Knowledge Base</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Supabase provides real Auth, a real Postgres database with Row Level
+     Security, and realtime sync — replacing the earlier Firebase draft. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#F6F7F9;
+    --card:#FFFFFF;
+    --primary:#3B4C7A;
+    --primary-light:#4E619180;
+    --primary-hover:#46598C;
+    --primary-soft:#EEF1F8;
+    --primary-border:#DCE3F1;
+    --success:#2E7A58;
+    --success-soft:#E8F3EE;
+    --success-border:#CBE4D8;
+    --warning:#9C7318;
+    --warning-soft:#FAF2E0;
+    --warning-border:#EEDEB4;
+    --danger:#A0422F;
+    --danger-soft:#FAEBE7;
+    --danger-border:#EFD3CC;
+    --text:#1D2433;
+    --text-2:#404A5C;
+    --text-muted:#6E7789;
+    --border:#E4E7EE;
+    --border-strong:#D3D8E3;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(24,30,46,.04), 0 2px 8px rgba(24,30,46,.05);
+    --shadow-lg:0 10px 34px rgba(24,30,46,.16);
+    --sidebar-w:236px;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    --font-ar:'IBM Plex Sans Arabic','Segoe UI',Tahoma,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;overflow-x:hidden;}
+  body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text);
+       -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.6;}
+  html[dir="rtl"] body{font-family:var(--font-ar);}
+  html[dir="rtl"] input,html[dir="rtl"] textarea,html[dir="rtl"] select,html[dir="rtl"] button{font-family:var(--font-ar);}
+  button,input,select,textarea{font-family:inherit;font-size:inherit;}
+  ::selection{background:#CFD9EE;}
 
-update kb_data
-set data = jsonb_set(
-  data,
-  '{knowledgeItems}',
-  (
-    select jsonb_agg(
-      case
-        when elem->>'id' = 'kb201' then
-          jsonb_set(
-            elem,
-            '{id}',
-            to_jsonb('kb201_' || row_number() over (partition by (elem->>'id') order by elem->'en'->>'title'))
-          )
-        else elem
-      end
-      order by ord
-    )
-    from jsonb_array_elements(data->'knowledgeItems') with ordinality as t(elem, ord)
-  )
-)
-where id = 1;
+  #app{display:flex;min-height:100vh;}
+  .sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--primary);color:#fff;
+    display:flex;flex-direction:column;padding:18px 13px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 7px 15px;border-bottom:1px solid rgba(255,255,255,.13);margin-bottom:13px;}
+  .brand-mark{width:33px;height:33px;border-radius:9px;background:rgba(255,255,255,.16);
+    display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0;}
+  .brand-title{font-size:13.5px;font-weight:600;line-height:1.3;}
+  .brand-sub{font-size:11px;color:rgba(255,255,255,.55);line-height:1.3;}
+  .lang-toggle{display:flex;background:rgba(255,255,255,.1);border-radius:8px;padding:3px;margin-bottom:14px;gap:2px;}
+  .lang-btn{flex:1;border:none;background:transparent;color:rgba(255,255,255,.62);font-size:11.5px;
+    font-weight:700;padding:6px 4px;border-radius:6px;cursor:pointer;transition:.15s;}
+  .lang-btn.active{background:rgba(255,255,255,.2);color:#fff;}
+  .user-chip{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:9px;background:rgba(255,255,255,.08);margin-bottom:14px;}
+  .user-avatar{width:29px;height:29px;border-radius:50%;background:rgba(255,255,255,.2);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+  .user-meta{line-height:1.3;min-width:0;flex:1;}
+  .user-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .user-role{font-size:10.5px;color:rgba(255,255,255,.55);}
+  .icon-btn{background:transparent;border:none;color:rgba(255,255,255,.55);cursor:pointer;font-size:14px;padding:4px;flex-shrink:0;border-radius:5px;}
+  .icon-btn:hover{color:#fff;background:rgba(255,255,255,.1);}
+  .nav-group{display:flex;flex-direction:column;gap:2px;}
+  .nav-label{font-size:10.5px;color:rgba(255,255,255,.42);padding:11px 10px 5px;letter-spacing:.3px;font-weight:600;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:rgba(255,255,255,.82);
+    cursor:pointer;font-size:13.5px;border:none;background:transparent;width:100%;text-align:start;transition:.15s;}
+  .nav-item:hover{background:rgba(255,255,255,.09);color:#fff;}
+  .nav-item.active{background:rgba(255,255,255,.16);color:#fff;font-weight:600;}
+  .nav-icon{width:17px;text-align:center;flex-shrink:0;font-size:13.5px;}
+  .nav-badge{margin-inline-start:auto;background:rgba(255,255,255,.18);font-size:10.5px;padding:1px 7px;border-radius:20px;}
+  .sidebar-spacer{flex:1;min-height:14px;}
+
+  .main{flex:1;min-width:0;padding:30px 34px 64px;}
+  .container{max-width:920px;margin:0 auto;}
+  .container-wide{max-width:1200px;margin:0 auto;}
+
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;}
+  .page-title{font-size:21px;font-weight:700;margin:0 0 3px;letter-spacing:-.2px;}
+  .page-sub{font-size:13px;color:var(--text-muted);margin:0;}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:8px;
+    border:1px solid transparent;font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;}
+  .btn:active{transform:scale(.985);}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-primary:hover{background:var(--primary-hover);}
+  .btn-outline{background:#fff;color:var(--primary);border-color:var(--border-strong);}
+  .btn-outline:hover{border-color:var(--primary);}
+  .btn-ghost{background:transparent;color:var(--text-muted);}
+  .btn-ghost:hover{background:var(--primary-soft);color:var(--text);}
+  .btn-danger{background:#fff;color:var(--danger);border-color:var(--danger-border);}
+  .btn-danger:hover{background:var(--danger-soft);}
+  .btn-danger-solid{background:var(--danger);color:#fff;}
+  .btn-danger-solid:hover{opacity:.92;}
+  .btn-sm{padding:6px 11px;font-size:12.5px;border-radius:7px;}
+  .btn-block{width:100%;}
+  .btn[disabled]{opacity:.5;cursor:not-allowed;}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .card-pad{padding:22px;}
+
+  .hero{text-align:center;padding:52px 18px 8px;}
+  .hero h1{font-size:25px;font-weight:700;margin:0 0 8px;letter-spacing:-.3px;}
+  .hero p{color:var(--text-muted);font-size:13.5px;margin:0 0 26px;}
+  .search-shell{display:flex;gap:8px;background:#fff;border:1px solid var(--border-strong);border-radius:12px;
+    padding:6px;box-shadow:var(--shadow);max-width:660px;margin:0 auto;transition:.15s;}
+  .search-shell:focus-within{border-color:var(--primary);}
+  .search-shell input{flex:1;border:none;outline:none;font-size:15px;padding:10px 12px;background:transparent;color:var(--text);}
+  .search-icon{display:flex;align-items:center;padding-inline-start:10px;color:var(--text-muted);}
+  .search-filters{display:flex;gap:10px;justify-content:center;margin:16px auto 0;max-width:660px;flex-wrap:wrap;}
+  .filter-select{padding:7px 10px;border-radius:7px;border:1px solid var(--border-strong);background:#fff;font-size:12.5px;color:var(--text-2);}
+  .quick-tags{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px;}
+  .quick-tag{padding:6px 13px;border-radius:20px;background:#fff;border:1px solid var(--border);
+    color:var(--text-2);font-size:12px;cursor:pointer;transition:.15s;}
+  .quick-tag:hover{border-color:var(--primary);color:var(--primary);}
+
+  .results-wrap{margin-top:28px;animation:fadeIn .25s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:translateY(0);}}
+  .best-match-tag{display:inline-flex;align-items:center;gap:6px;background:var(--success-soft);color:var(--success);
+    font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:20px;margin-bottom:10px;}
+  .result-card{padding:0;overflow:hidden;margin-bottom:14px;}
+  .result-head{padding:19px 22px 15px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
+  .result-title{font-size:18px;font-weight:700;margin:0 0 7px;line-height:1.4;}
+  .result-meta{display:flex;gap:7px;flex-wrap:wrap;}
+  .badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;background:var(--primary-soft);
+    color:var(--primary);border:1px solid var(--primary-border);}
+  .badge-team{background:#F2F0F9;color:#584A8C;border-color:#E3DEF2;}
+  .badge-type{background:#FFF;color:var(--text-muted);border-color:var(--border-strong);}
+  .badge-active{background:var(--success-soft);color:var(--success);border-color:var(--success-border);}
+  .badge-inactive{background:#F2F3F6;color:var(--text-muted);border-color:var(--border-strong);}
+  .badge-warn{background:var(--warning-soft);color:var(--warning);border-color:var(--warning-border);}
+  .fav-btn{border:1px solid var(--border-strong);background:#fff;border-radius:8px;width:34px;height:34px;
+    font-size:15px;cursor:pointer;color:var(--text-muted);flex-shrink:0;transition:.15s;}
+  .fav-btn:hover{border-color:#DCBA6A;}
+  .fav-btn.active{background:#FDF7E7;border-color:#E6CE8E;color:#96751F;}
+
+  .result-body{padding:6px 22px 20px;}
+  .section-block{padding:16px 0;border-bottom:1px solid var(--border);}
+  .section-block:last-child{border-bottom:none;padding-bottom:4px;}
+  .section-block h4{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin:0 0 9px;font-weight:700;}
+  .section-block p{margin:0;font-size:14px;line-height:1.75;color:var(--text-2);}
+  .response-box{background:var(--primary-soft);border:1px solid var(--primary-border);border-radius:9px;padding:15px 16px;position:relative;}
+  .response-box p{white-space:pre-wrap;color:var(--text);}
+  .copy-btn{position:absolute;top:10px;inset-inline-end:10px;background:#fff;border:1px solid var(--border-strong);
+    border-radius:6px;font-size:11.5px;padding:4px 10px;cursor:pointer;color:var(--text-muted);font-weight:600;transition:.15s;}
+  .copy-btn:hover{color:var(--primary);border-color:var(--primary);}
+  .steps-list{margin:0;padding-inline-start:0;list-style:none;display:flex;flex-direction:column;gap:10px;}
+  .steps-list li{display:flex;gap:11px;font-size:14px;line-height:1.65;align-items:flex-start;color:var(--text-2);}
+  .step-num{width:21px;height:21px;border-radius:50%;background:var(--primary);color:#fff;font-size:11px;
+    font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:3px;}
+  .escalation-box{border-radius:9px;padding:15px 16px;display:flex;flex-direction:column;gap:8px;}
+  .escalation-yes{background:var(--warning-soft);border:1px solid var(--warning-border);}
+  .escalation-no{background:var(--success-soft);border:1px solid var(--success-border);}
+  .escalation-row{display:flex;gap:9px;font-size:13.5px;align-items:baseline;flex-wrap:wrap;}
+  .escalation-row b{min-width:145px;font-weight:700;color:var(--text);}
+  .req-info-list{margin:0;padding-inline-start:20px;font-size:14px;line-height:1.85;color:var(--text-2);}
+  .notes-box{background:#FBFBFC;border:1px dashed var(--border-strong);border-radius:9px;padding:13px 15px;font-size:13.5px;color:var(--text-2);line-height:1.7;}
+  .quality-item{border:1px solid var(--border);border-radius:9px;padding:13px 15px;margin-bottom:9px;background:#FCFCFD;}
+  .quality-item:last-child{margin-bottom:0;}
+  .quality-item-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:7px;}
+  .quality-item-title{font-size:13.5px;font-weight:700;color:var(--text);}
+  .quality-line{font-size:13px;color:var(--text-2);line-height:1.65;margin-top:4px;}
+  .quality-line b{color:var(--text-muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:1px;}
+  .prio{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;}
+  .prio-critical{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);}
+  .prio-high{background:var(--warning-soft);color:var(--warning);border:1px solid var(--warning-border);}
+  .prio-medium{background:var(--primary-soft);color:var(--primary);border:1px solid var(--primary-border);}
+  .prio-low{background:#F2F3F6;color:var(--text-muted);border:1px solid var(--border-strong);}
+
+  .accordion{border:1px solid var(--border);border-radius:9px;overflow:hidden;}
+  .accordion summary{padding:12px 15px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text-2);
+    background:#FBFBFC;list-style:none;display:flex;align-items:center;gap:8px;}
+  .accordion summary::-webkit-details-marker{display:none;}
+  .accordion summary:before{content:"▸";font-size:11px;color:var(--text-muted);transition:.15s;}
+  .accordion[open] summary:before{transform:rotate(90deg);}
+  html[dir="rtl"] .accordion summary:before{content:"◂";}
+  html[dir="rtl"] .accordion[open] summary:before{transform:rotate(-90deg);}
+  .accordion-body{padding:15px;border-top:1px solid var(--border);}
+
+  .other-matches h5{font-size:12.5px;color:var(--text-muted);margin:0 0 10px;font-weight:600;}
+  .other-match-row{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:#fff;
+    border:1px solid var(--border);border-radius:9px;margin-bottom:8px;cursor:pointer;transition:.15s;}
+  .other-match-row:hover{border-color:var(--primary);}
+  .other-match-row .t{font-size:13.5px;font-weight:600;}
+  .other-match-row .c{font-size:11.5px;color:var(--text-muted);margin-top:1px;}
+
+  .no-match{text-align:center;padding:44px 20px;}
+  .no-match .icon{font-size:32px;margin-bottom:10px;opacity:.7;}
+  .no-match h3{font-size:16px;margin:0 0 7px;}
+  .no-match p{color:var(--text-muted);font-size:13.5px;margin:0 0 18px;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);
+    color:#fff;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);
+    opacity:0;pointer-events:none;transition:.22s;z-index:999;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;width:100%;padding:20px;}
+  .login-card{width:390px;max-width:100%;padding:34px;text-align:center;}
+  .login-logo{width:46px;height:46px;border-radius:12px;background:var(--primary);color:#fff;margin:0 auto 16px;
+    display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;}
+  .login-card h2{font-size:18px;margin:0 0 5px;}
+  .login-card>p{font-size:13px;color:var(--text-muted);margin:0 0 24px;}
+  .login-lang{display:flex;justify-content:center;gap:4px;margin-bottom:20px;}
+  .login-lang button{border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);font-size:11.5px;
+    font-weight:700;padding:5px 14px;border-radius:7px;cursor:pointer;}
+  .login-lang button.active{background:var(--primary-soft);color:var(--primary);border-color:var(--primary-border);}
+  .field{margin-bottom:15px;text-align:start;}
+  .field label{font-size:12.5px;font-weight:600;color:var(--text-2);display:block;margin-bottom:6px;}
+  .field input,.field select,.field textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border-strong);
+    outline:none;background:#fff;color:var(--text);font-size:14px;transition:.15s;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary);}
+  .field textarea{resize:vertical;min-height:70px;line-height:1.65;}
+  .field-hint{font-size:11.5px;color:var(--text-muted);font-weight:400;}
+  .pass-row{position:relative;}
+  .pass-row input{padding-inline-end:62px;}
+  .pass-row button{position:absolute;inset-inline-end:7px;top:50%;transform:translateY(-50%);background:transparent;
+    border:none;font-size:11.5px;color:var(--primary);cursor:pointer;font-weight:600;padding:4px 6px;}
+  .login-error{background:var(--danger-soft);color:var(--danger);font-size:12.5px;padding:9px 12px;
+    border-radius:8px;margin-bottom:15px;border:1px solid var(--danger-border);text-align:start;}
+  .demo-note{margin-top:20px;font-size:11.5px;color:var(--text-muted);background:#FBFBFC;border:1px dashed var(--border-strong);
+    border-radius:8px;padding:10px 12px;line-height:1.8;text-align:start;}
+  .demo-note code{background:#EEF0F4;padding:1px 6px;border-radius:4px;font-size:11px;}
+
+  .tabbar{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:22px;overflow-x:auto;}
+  .tab{padding:10px 14px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;
+    border-bottom:2px solid transparent;white-space:nowrap;transition:.15s;}
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--primary);border-color:var(--primary);}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+  .stat-card{padding:17px 19px;}
+  .stat-card .n{font-size:25px;font-weight:700;letter-spacing:-.5px;}
+  .stat-card .l{font-size:12px;color:var(--text-muted);margin-top:2px;line-height:1.4;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:15px;}
+  .panel-title{margin:0 0 15px;font-size:13px;font-weight:700;}
+  .bar-row{display:flex;align-items:center;gap:11px;margin-bottom:11px;}
+  .bar-row:last-child{margin-bottom:0;}
+  .bar-label{font-size:12.5px;width:145px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);}
+  .bar-track{flex:1;background:#EEF0F4;border-radius:6px;height:8px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--primary);border-radius:6px;opacity:.75;}
+  .bar-count{font-size:12px;color:var(--text-muted);width:26px;text-align:end;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  .kb-row-clickable{cursor:pointer;}
+  .kb-row-clickable:hover{background:var(--primary-soft);}
+  th{text-align:start;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);
+    padding:11px 14px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap;}
+  td{padding:13px 14px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-2);}
+  tr:last-child td{border-bottom:none;}
+  tr.tr-hover:hover{background:#FAFBFC;cursor:pointer;}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .empty-state{text-align:center;padding:52px 20px;color:var(--text-muted);font-size:13.5px;}
+  .empty-state .icon{font-size:26px;margin-bottom:10px;opacity:.6;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .search-mini{display:flex;align-items:center;gap:8px;border:1px solid var(--border-strong);border-radius:8px;
+    padding:8px 11px;background:#fff;min-width:230px;}
+  .search-mini input{border:none;outline:none;font-size:13px;flex:1;background:transparent;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(20,25,38,.48);display:flex;align-items:center;
+    justify-content:center;z-index:200;animation:fadeIn .18s ease;padding:20px;}
+  .modal{background:#fff;border-radius:12px;box-shadow:var(--shadow-lg);width:440px;max-width:100%;padding:26px;animation:pop .18s ease;}
+  @keyframes pop{from{transform:scale(.97);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .modal.wide{width:680px;}
+  .modal h3{margin:0 0 9px;font-size:16.5px;}
+  .modal>p{margin:0 0 20px;font-size:13.5px;color:var(--text-muted);line-height:1.65;}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+  .modal-scroll{max-height:68vh;overflow-y:auto;margin-bottom:18px;}
+
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px 16px;}
+  .form-full{grid-column:1/-1;}
+  .lang-section{border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:6px;background:#FCFCFD;}
+  .lang-section-head{display:flex;align-items:center;gap:9px;margin-bottom:15px;}
+  .lang-flag{font-size:11px;font-weight:700;background:var(--primary-soft);color:var(--primary);
+    padding:3px 10px;border-radius:6px;border:1px solid var(--primary-border);}
+  .lang-section-head span{font-size:12px;color:var(--text-muted);}
+  .divider{height:1px;background:var(--border);margin:22px 0;}
+  .form-section-title{font-size:13px;font-weight:700;margin:0 0 4px;}
+  .form-section-desc{font-size:12.5px;color:var(--text-muted);margin:0 0 14px;line-height:1.6;}
+
+  .manage-list-item{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;
+    border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;gap:10px;}
+  .manage-list-item:last-child{margin-bottom:0;}
+  .manage-list-item input{border:none;background:transparent;font-size:13.5px;font-weight:600;width:100%;outline:none;color:var(--text);}
+  .switch-row{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border-strong);
+    border-radius:9px;padding:12px 14px;gap:14px;background:#fff;}
+  .switch{position:relative;width:38px;height:21px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:#D3D8E3;border-radius:20px;cursor:pointer;transition:.15s;}
+  .slider:before{content:"";position:absolute;width:16px;height:16px;inset-inline-start:2.5px;top:2.5px;
+    background:#fff;border-radius:50%;transition:.15s;}
+  .switch input:checked+.slider{background:var(--primary);}
+  .switch input:checked+.slider:before{transform:translateX(17px);}
+  html[dir="rtl"] .switch input:checked+.slider:before{transform:translateX(-17px);}
+  .status-pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:5px;}
+  .status-pending{background:var(--warning-soft);color:var(--warning);}
+  .status-added{background:var(--success-soft);color:var(--success);}
+  .status-ignored{background:#F2F3F6;color:var(--text-muted);}
+  .mini-avatar{width:26px;height:26px;border-radius:50%;background:var(--primary-soft);color:var(--primary);
+    font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .user-col{display:flex;align-items:center;gap:9px;}
+  .role-pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:5px;}
+  .role-admin{background:#F2F0F9;color:#584A8C;border:1px solid #E3DEF2;}
+  .role-employee{background:var(--primary-soft);color:var(--primary);border:1px solid var(--primary-border);}
+  .info-banner{background:var(--primary-soft);border:1px solid var(--primary-border);border-radius:9px;
+    padding:13px 16px;font-size:12.5px;color:var(--text-2);line-height:1.7;margin-bottom:18px;}
+  .clarify-flag{background:var(--warning-soft);color:var(--warning);border:1px solid var(--warning-border);
+    font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;}
+
+  .sync-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
+    background:rgba(255,255,255,.07);font-size:11.5px;color:rgba(255,255,255,.72);margin-top:10px;}
+  .sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .sync-dot.on{background:#7FD1A8;box-shadow:0 0 0 3px rgba(127,209,168,.18);}
+  .sync-dot.off{background:#C9A227;}
+  .sync-text{flex:1;}
+  .err-card{border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:12px;background:#fff;box-shadow:var(--shadow);}
+  .err-head{display:flex;align-items:flex-start;gap:12px;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;}
+  .err-code{font-size:11px;font-weight:700;background:var(--primary-soft);color:var(--primary);
+    border:1px solid var(--primary-border);padding:3px 9px;border-radius:6px;flex-shrink:0;}
+  .err-title{font-size:15.5px;font-weight:700;line-height:1.45;margin:0;}
+  .err-row{margin-top:12px;}
+  .err-row b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;
+    color:var(--text-muted);font-weight:700;margin-bottom:4px;}
+  .err-row span{font-size:13.5px;line-height:1.75;color:var(--text-2);}
+  .err-example{background:#FBFBFC;border:1px dashed var(--border-strong);border-radius:8px;padding:11px 13px;}
+  .mobile-toggle{display:none;position:fixed;top:14px;inset-inline-start:14px;z-index:140;background:var(--primary);
+    color:#fff;border:none;border-radius:8px;width:38px;height:38px;font-size:16px;cursor:pointer;}
+  @media (max-width:980px){
+    .sidebar{position:fixed;left:0;top:0;z-index:150;transform:translateX(-100%);transition:transform .2s ease;}
+    html[dir="rtl"] .sidebar{left:auto;right:0;transform:translateX(100%);}
+    .sidebar.open{transform:translateX(0);}
+    html[dir="rtl"] .sidebar.open{transform:translateX(0);}
+    .main{padding:20px 16px 50px;}
+    .stat-grid{grid-template-columns:1fr 1fr;}
+    .two-col,.form-grid{grid-template-columns:1fr;}
+    .mobile-toggle{display:flex;align-items:center;justify-content:center;}
+    .search-filters{flex-direction:column;align-items:stretch;}
+    .escalation-row b{min-width:100%;}
+  }
+</style>
+</head>
+<body>
+<button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   SUPPORT KNOWLEDGE BASE — Architecture overview
+   ---------------------------------------------------------------------
+   LAYERS
+     1. DATA        — plain arrays, the single source of truth. Swappable
+                      for real API calls without touching the UI layer.
+     2. AUTH/RBAC   — session + permission matrix. Every view render and
+                      every mutating action passes through a guard.
+     3. I18N        — UI strings (translations) + bilingual content
+                      stored per knowledge item under .en / .ar.
+     4. SEARCH      — scores a query against BOTH language corpora so an
+                      Arabic query can surface an item and display it in
+                      whichever language the user is working in.
+     5. UI          — pure render functions reading from DATA. No content
+                      is hardcoded inside components.
+
+   RELATIONSHIP MODEL
+     Knowledge Base (any information type)
+        └─► selected parts become ──► Quality Rules (1 : many)
+                                         └─► future: Employee Evaluation
+   ===================================================================== */
+
+/* ============================== 1. DATA ============================== */
+let categories = ["Deposits","Withdrawals","USDT","MaxPay","Max Fi","Trading","MT5","Verification","IB","Technical Issues","Account","Other"];
+let teams = ["Technical Support","Financial Department","IB Department","Compliance","Operations"];
+
+// Knowledge types — a knowledge item is NOT necessarily a Q&A.
+let knowledgeTypes = [
+  { id:"faq",        en:"FAQ",                  ar:"سؤال شائع" },
+  { id:"procedure",  en:"Procedure",            ar:"إجراء" },
+  { id:"policy",     en:"Policy",               ar:"سياسة" },
+  { id:"rule",       en:"Rule",                 ar:"قاعدة" },
+  { id:"internal",   en:"Internal Information",  ar:"معلومة داخلية" },
+  { id:"trouble",    en:"Troubleshooting",      ar:"حل المشكلات" },
+  { id:"escalation", en:"Escalation Procedure", ar:"إجراء تصعيد" },
+  { id:"other",      en:"Other",                ar:"أخرى" }
+];
+
+/* Each knowledge item holds a full Arabic version and a full English
+   version. Shared/structural fields (category, team, type, status) live
+   at the top level because they are language-independent. */
+let knowledgeItems = [
+  {
+    id:"kb1", category:"Deposits", subcategory:"USDT", type:"procedure",
+    responsibleTeam:"Financial Department", raiseRequest:true,
+    status:"Active", needsClarification:false,
+    createdAt:"2026-08-01", updatedAt:"2026-09-10",
+    en:{
+      title:"USDT Deposit Pending",
+      keywords:["usdt","deposit","pending","delayed","crypto","network","not credited","txid"],
+      exampleQuestions:[
+        "My USDT deposit hasn't arrived",
+        "Client made a USDT deposit and the balance hasn't appeared",
+        "The deposit is delayed",
+        "Client withdrawal deposit not showing in account"
+      ],
+      explanation:"The client has made a USDT deposit and the balance has not been credited to the account yet. In most cases this is a network confirmation delay, but it can also result from using the wrong network or an incorrect wallet address.",
+      internalAnswer:"Request the Transaction ID (TXID) and the network used (TRC20 / ERC20 / BEP20) from the client. Verify the transaction on the blockchain explorer and cross-check it against the payment provider dashboard before escalating. Do not quote a confirmation time that is not confirmed in the system.",
+      clientResponse:"Thank you for contacting us. USDT deposits are credited once the network confirms the transaction. Could you please share the Transaction ID (TXID) and the network you used (TRC20 / ERC20 / BEP20)? We will check this for you right away.",
+      supportSteps:[
+        "Open the client's account and check for any pending deposit entries.",
+        "Ask the client for the Transaction ID (TXID), the network used, and the exact amount.",
+        "Verify the transaction on the relevant blockchain explorer.",
+        "If the transaction is confirmed on-chain but not credited internally, escalate to the Financial Department.",
+        "If the transaction is not yet confirmed on-chain, inform the client that it is awaiting network confirmation."
+      ],
+      escalationConditions:"Raise a request only if the transaction is confirmed on the blockchain explorer and the balance is still not credited after 30 minutes.",
+      requiredInformation:["Transaction ID (TXID)","Amount","Network (TRC20 / ERC20 / BEP20)","Wallet address","Screenshot of the transaction"],
+      importantNotes:"Do not confirm any processing time to the client beyond what is stated here. Do not estimate fees or network cut-off times."
+    },
+    ar:{
+      title:"إيداع USDT قيد الانتظار",
+      keywords:["يو اس دي تي","usdt","إيداع","معلق","متأخر","الرصيد","الشبكة","لم يظهر","تحويل"],
+      exampleQuestions:[
+        "العميل عمل إيداع USDT ولسه موصلش",
+        "الإيداع متأخر والرصيد لم يظهر",
+        "عميل بيقول إن الإيداع بتاعه مش ظاهر في الحساب",
+        "إيداع العملات الرقمية لم يُضف للحساب"
+      ],
+      explanation:"قام العميل بعمل إيداع (Deposit) بعملة USDT ولم تتم إضافة الرصيد إلى الحساب حتى الآن. في أغلب الحالات يكون السبب تأخيرًا في تأكيد الشبكة (Network Confirmation)، وقد يكون السبب أيضًا استخدام شبكة خاطئة أو عنوان محفظة غير صحيح.",
+      internalAnswer:"اطلب من العميل رقم العملية (TXID) والشبكة المستخدمة (TRC20 / ERC20 / BEP20). تحقق من العملية على مستكشف البلوك تشين (Blockchain Explorer) وقارنها بلوحة مزود الدفع قبل التصعيد. لا تذكر للعميل مدة تنفيذ غير مؤكدة في النظام.",
+      clientResponse:"شكرًا لتواصلك معنا. تتم إضافة إيداعات USDT بعد تأكيد الشبكة للعملية. هل يمكنك من فضلك تزويدنا برقم العملية (TXID) والشبكة التي استخدمتها (TRC20 / ERC20 / BEP20)؟ سنقوم بمراجعة الأمر فورًا.",
+      supportSteps:[
+        "افتح حساب العميل وتحقق من وجود أي عمليات إيداع معلقة.",
+        "اطلب من العميل رقم العملية (TXID) والشبكة المستخدمة والمبلغ بدقة.",
+        "تحقق من العملية على مستكشف البلوك تشين الخاص بالشبكة.",
+        "إذا كانت العملية مؤكدة على الشبكة ولم تُضف للحساب، قم برفع طلب إلى القسم المالي.",
+        "إذا كانت العملية غير مؤكدة على الشبكة، أبلغ العميل بأنها في انتظار تأكيد الشبكة."
+      ],
+      escalationConditions:"يتم رفع الطلب فقط إذا كانت العملية مؤكدة على مستكشف البلوك تشين ولم يُضف الرصيد بعد مرور 30 دقيقة.",
+      requiredInformation:["رقم العملية (TXID)","المبلغ","الشبكة (TRC20 / ERC20 / BEP20)","عنوان المحفظة","صورة من العملية"],
+      importantNotes:"لا تؤكد للعميل أي مدة تنفيذ غير مذكورة هنا. لا تجتهد في تقدير الرسوم أو مواعيد إغلاق الشبكة."
+    }
+  },
+  {
+    id:"kb2", category:"Withdrawals", subcategory:"General", type:"procedure",
+    responsibleTeam:"Financial Department", raiseRequest:true,
+    status:"Active", needsClarification:false,
+    createdAt:"2026-08-02", updatedAt:"2026-09-05",
+    en:{
+      title:"Withdrawal Under Review",
+      keywords:["withdrawal","pending","under review","not processed","payout","request"],
+      exampleQuestions:[
+        "My withdrawal request is still pending",
+        "Client says his withdrawal is still under review",
+        "Client withdrawal is still under review",
+        "When will the withdrawal be processed?"
+      ],
+      explanation:"The client has submitted a withdrawal request that has not been processed yet. Withdrawal requests pass through an internal review step before the funds are released.",
+      internalAnswer:"Check the withdrawal status in the back office. If the request is still under manual review, inform the client that this is a normal part of the process. If the request has remained without any movement beyond the standard review step, escalate it.",
+      clientResponse:"Thank you for your patience. Withdrawal requests go through a verification step before the funds are released. We are checking the current status of your request and will update you shortly.",
+      supportSteps:[
+        "Open the client's account and locate the withdrawal request.",
+        "Check whether the request is under review, approved, or rejected.",
+        "Ask the client for the submission date and the amount if they are not visible.",
+        "If the request has remained under review with no movement, escalate to the Financial Department.",
+        "If the request was rejected, review the rejection reason before replying to the client."
+      ],
+      escalationConditions:"Raise a request if the withdrawal has remained in 'Under Review' status with no update, or if the client reports that the amount was deducted without being received.",
+      requiredInformation:["Withdrawal request ID","Amount","Submission date","Payment method"],
+      importantNotes:"Do not promise a specific release time. Refer only to the status shown in the system."
+    },
+    ar:{
+      title:"السحب قيد المراجعة",
+      keywords:["سحب","طلب سحب","قيد المراجعة","معلق","تحت المراجعة","لم يتم تنفيذه"],
+      exampleQuestions:[
+        "العميل بيقول إن السحب بتاعه لسه تحت المراجعة",
+        "طلب السحب لسه معلق",
+        "متى يتم تنفيذ طلب السحب؟",
+        "العميل بيسأل عن حالة طلب السحب"
+      ],
+      explanation:"قام العميل بتقديم طلب سحب (Withdrawal) ولم يتم تنفيذه حتى الآن. تمر طلبات السحب بمرحلة مراجعة داخلية قبل الإفراج عن المبلغ.",
+      internalAnswer:"تحقق من حالة طلب السحب في النظام. إذا كان الطلب ما زال في مرحلة المراجعة اليدوية، أبلغ العميل بأن هذا جزء طبيعي من الإجراء. أما إذا ظل الطلب دون أي تحديث بعد تجاوز مرحلة المراجعة المعتادة، فقم بتصعيده.",
+      clientResponse:"نشكر لك سعة صدرك. تمر طلبات السحب بمرحلة تحقق قبل الإفراج عن المبلغ. نقوم حاليًا بمراجعة حالة طلبك وسنوافيك بالتحديث في أقرب وقت.",
+      supportSteps:[
+        "افتح حساب العميل وحدد طلب السحب المطلوب.",
+        "تحقق مما إذا كان الطلب قيد المراجعة أو تمت الموافقة عليه أو تم رفضه.",
+        "اطلب من العميل تاريخ تقديم الطلب والمبلغ إذا لم يكونا ظاهرين.",
+        "إذا ظل الطلب قيد المراجعة دون أي تحديث، قم برفع طلب إلى القسم المالي.",
+        "إذا تم رفض الطلب، راجع سبب الرفض قبل الرد على العميل."
+      ],
+      escalationConditions:"يتم رفع الطلب إذا ظل السحب في حالة «قيد المراجعة» دون أي تحديث، أو إذا أبلغ العميل بخصم المبلغ دون استلامه.",
+      requiredInformation:["رقم طلب السحب","المبلغ","تاريخ تقديم الطلب","وسيلة الدفع"],
+      importantNotes:"لا تَعِد العميل بموعد تنفيذ محدد. اعتمد فقط على الحالة الظاهرة في النظام."
+    }
+  },
+  {
+    id:"kb3", category:"Verification", subcategory:"KYC", type:"procedure",
+    responsibleTeam:"Compliance", raiseRequest:true,
+    status:"Active", needsClarification:false,
+    createdAt:"2026-07-20", updatedAt:"2026-09-01",
+    en:{
+      title:"Account Verification Issue",
+      keywords:["verification","kyc","documents","rejected","identity","account not verified"],
+      exampleQuestions:[
+        "My account verification was rejected",
+        "Why is my account still not verified?",
+        "I uploaded my documents and received no response"
+      ],
+      explanation:"The client's identity or address verification documents have not been approved, or the client is asking about the current verification status of the account.",
+      internalAnswer:"Check the verification section for the rejection reason when available. Common reasons include unclear documents, a name mismatch, or an expired identity document. If the status is pending with no rejection reason, the documents are still in the review queue.",
+      clientResponse:"We understand how important this is to you. We are reviewing the current status of your verification and the documents you submitted, and we will guide you on the next step if anything needs to be resubmitted.",
+      supportSteps:[
+        "Open the verification section in the client's account.",
+        "Check whether the documents are pending, approved, or rejected, and identify the reason.",
+        "If the documents were rejected, explain the specific reason to the client in clear terms.",
+        "Ask the client to resubmit clear documents if required.",
+        "If the documents have remained pending beyond the normal review queue, escalate to Compliance."
+      ],
+      escalationConditions:"Raise a request if the documents have remained under review beyond the normal queue time with no rejection reason displayed.",
+      requiredInformation:["Full name on the account","Type of document submitted","Submission date","Screenshot of the error, if any"],
+      importantNotes:"Never guarantee an approval outcome to the client. Compliance has the final decision on document validity."
+    },
+    ar:{
+      title:"مشكلة في توثيق الحساب",
+      keywords:["توثيق","تفعيل الحساب","مستندات","مرفوض","الهوية","الحساب غير موثق","kyc"],
+      exampleQuestions:[
+        "تم رفض توثيق حسابي",
+        "ليه حسابي لسه مش متفعل؟",
+        "رفعت المستندات ولم يصلني أي رد"
+      ],
+      explanation:"لم تتم الموافقة على مستندات إثبات الهوية أو العنوان الخاصة بالعميل، أو أن العميل يستفسر عن حالة توثيق حسابه (Verification).",
+      internalAnswer:"راجع قسم التوثيق للاطلاع على سبب الرفض إن وُجد. من الأسباب الشائعة: عدم وضوح المستندات، أو اختلاف الاسم، أو انتهاء صلاحية إثبات الهوية. وإذا كانت الحالة «قيد المراجعة» دون سبب رفض، فالمستندات ما زالت في قائمة المراجعة.",
+      clientResponse:"نتفهم أهمية هذا الأمر بالنسبة لك. نقوم حاليًا بمراجعة حالة التوثيق والمستندات التي قمت بإرسالها، وسنوضح لك الخطوة التالية إذا كان هناك أي مستند يحتاج إلى إعادة إرسال.",
+      supportSteps:[
+        "افتح قسم التوثيق في حساب العميل.",
+        "تحقق مما إذا كانت المستندات قيد المراجعة أو مقبولة أو مرفوضة، وحدد السبب.",
+        "إذا تم رفض المستندات، اشرح للعميل السبب بوضوح.",
+        "اطلب من العميل إعادة إرسال مستندات واضحة إذا لزم الأمر.",
+        "إذا ظلت المستندات قيد المراجعة بعد تجاوز المدة المعتادة، قم برفع طلب إلى قسم الالتزام (Compliance)."
+      ],
+      escalationConditions:"يتم رفع الطلب إذا ظلت المستندات قيد المراجعة بعد تجاوز المدة المعتادة دون ظهور سبب رفض.",
+      requiredInformation:["الاسم الكامل المسجل في الحساب","نوع المستند المُرسل","تاريخ الإرسال","صورة من رسالة الخطأ إن وُجدت"],
+      importantNotes:"لا تضمن للعميل نتيجة الموافقة. القرار النهائي بشأن صحة المستندات يعود لقسم الالتزام."
+    }
+  },
+  {
+    id:"kb4", category:"MaxPay", subcategory:"Deposits", type:"trouble",
+    responsibleTeam:"Financial Department", raiseRequest:true,
+    status:"Active", needsClarification:false,
+    createdAt:"2026-08-15", updatedAt:"2026-09-08",
+    en:{
+      title:"MaxPay Deposit Issue",
+      keywords:["maxpay","deposit","failed","payment","deducted","gateway"],
+      exampleQuestions:[
+        "The MaxPay deposit failed but the amount was deducted",
+        "Client paid through MaxPay and the balance did not appear",
+        "MaxPay is not working for the client"
+      ],
+      explanation:"The client attempted a deposit through MaxPay and either the transaction failed on the provider's side, or the amount was deducted without being credited to the trading account.",
+      internalAnswer:"Request the MaxPay transaction reference and check the payment gateway dashboard. If the provider confirms a successful deduction while our system shows no matching deposit, escalate to the Financial Department with the reference number.",
+      clientResponse:"We apologise for the inconvenience. Could you please share the MaxPay transaction reference number and the exact amount? We will check this with our payments team and get back to you.",
+      supportSteps:[
+        "Ask the client for the MaxPay transaction reference number.",
+        "Check the transaction status on the payment gateway dashboard.",
+        "If the provider shows the transaction as successful but it is not reflected internally, escalate the case.",
+        "If the provider shows the transaction as failed, inform the client that the amount was not captured or will be returned automatically."
+      ],
+      escalationConditions:"Raise a request only when the MaxPay dashboard confirms a successful deduction that does not match any deposit on the client's trading account.",
+      requiredInformation:["MaxPay transaction reference","Amount","Date and time of the attempt","Screenshot of the deduction"],
+      importantNotes:"Do not promise a refund timeline. Refund timelines are determined by the Financial Department, not by Support."
+    },
+    ar:{
+      title:"مشكلة في الإيداع عبر MaxPay",
+      keywords:["ماكس باي","maxpay","إيداع","فشل","خصم","الدفع","بوابة الدفع"],
+      exampleQuestions:[
+        "الإيداع عبر MaxPay فشل وتم خصم المبلغ",
+        "العميل دفع من MaxPay والرصيد لم يظهر",
+        "MaxPay لا تعمل مع العميل"
+      ],
+      explanation:"حاول العميل الإيداع عبر MaxPay، وإما أن العملية فشلت لدى مزود الخدمة، أو تم خصم المبلغ دون إضافته إلى حساب التداول.",
+      internalAnswer:"اطلب رقم مرجع العملية في MaxPay وراجع لوحة بوابة الدفع. إذا أكّد مزود الخدمة نجاح الخصم بينما لا يوجد إيداع مطابق في نظامنا، قم برفع طلب إلى القسم المالي مرفقًا برقم المرجع.",
+      clientResponse:"نعتذر عن هذا الإزعاج. هل يمكنك من فضلك تزويدنا برقم مرجع العملية في MaxPay والمبلغ بدقة؟ سنقوم بمراجعة الأمر مع فريق المدفوعات ونوافيك بالرد.",
+      supportSteps:[
+        "اطلب من العميل رقم مرجع العملية في MaxPay.",
+        "راجع حالة العملية في لوحة بوابة الدفع.",
+        "إذا أظهر مزود الخدمة أن العملية ناجحة ولم تظهر في النظام، قم بتصعيد الحالة.",
+        "إذا أظهر مزود الخدمة أن العملية فاشلة، أبلغ العميل بأن المبلغ لم يُخصم فعليًا أو سيتم إرجاعه تلقائيًا."
+      ],
+      escalationConditions:"يتم رفع الطلب فقط عندما تؤكد لوحة MaxPay نجاح عملية خصم لا يقابلها أي إيداع في حساب تداول العميل.",
+      requiredInformation:["رقم مرجع العملية في MaxPay","المبلغ","تاريخ ووقت المحاولة","صورة من عملية الخصم"],
+      importantNotes:"لا تَعِد العميل بمدة زمنية لاسترجاع المبلغ. مدد الاسترجاع يحددها القسم المالي وليس فريق الدعم."
+    }
+  },
+  {
+    id:"kb5", category:"Max Fi", subcategory:"Platform", type:"trouble",
+    responsibleTeam:"Technical Support", raiseRequest:true,
+    status:"Active", needsClarification:false,
+    createdAt:"2026-08-20", updatedAt:"2026-09-11",
+    en:{
+      title:"Max Fi Technical Issue",
+      keywords:["max fi","technical","login","error","crash","application","platform"],
+      exampleQuestions:[
+        "The Max Fi app keeps crashing",
+        "The client cannot log in to Max Fi",
+        "An error message appears when opening the application"
+      ],
+      explanation:"The client is experiencing a technical problem on the Max Fi platform, such as a login failure, an application crash, or a visible error message.",
+      internalAnswer:"Ask the client for a screenshot of the error, the device and operating system, and the application version. Start with the basic checks: latest application version, stable internet connection, and correct login credentials. If the issue persists, escalate to Technical Support with all collected details.",
+      clientResponse:"We are sorry you are experiencing this. Could you please send us a screenshot of the error along with your device type and application version? In the meantime, please make sure the application is updated to the latest version.",
+      supportSteps:[
+        "Ask the client for a screenshot showing the exact error message.",
+        "Ask for the device type, the operating system, and the application version.",
+        "Confirm that the client is using the latest application version with a stable connection.",
+        "If the issue persists after the basic checks, escalate to Technical Support with all collected details."
+      ],
+      escalationConditions:"Raise a request if the issue persists after confirming that the application is updated and the connection is stable, or if the error appears to affect multiple clients.",
+      requiredInformation:["Screenshot of the error","Device type and operating system","Application version","Steps to reproduce the issue"],
+      importantNotes:"Do not attempt to diagnose server-side causes yourself. Collect the details and escalate."
+    },
+    ar:{
+      title:"مشكلة تقنية في Max Fi",
+      keywords:["ماكس فاي","max fi","مشكلة تقنية","تسجيل الدخول","خطأ","التطبيق","المنصة"],
+      exampleQuestions:[
+        "تطبيق Max Fi يتوقف باستمرار",
+        "العميل لا يستطيع تسجيل الدخول إلى Max Fi",
+        "تظهر رسالة خطأ عند فتح التطبيق"
+      ],
+      explanation:"يواجه العميل مشكلة تقنية في منصة Max Fi، مثل تعذّر تسجيل الدخول أو توقف التطبيق أو ظهور رسالة خطأ.",
+      internalAnswer:"اطلب من العميل صورة من رسالة الخطأ، ونوع الجهاز ونظام التشغيل، وإصدار التطبيق. ابدأ بالفحوصات الأساسية: أحدث إصدار من التطبيق، واتصال إنترنت مستقر، وصحة بيانات الدخول. وإذا استمرت المشكلة، قم بالتصعيد إلى الدعم الفني مع كل البيانات التي تم جمعها.",
+      clientResponse:"نأسف لما تواجهه. هل يمكنك من فضلك إرسال صورة من رسالة الخطأ مع توضيح نوع جهازك وإصدار التطبيق؟ وفي الوقت نفسه، يرجى التأكد من تحديث التطبيق إلى أحدث إصدار.",
+      supportSteps:[
+        "اطلب من العميل صورة توضح رسالة الخطأ بدقة.",
+        "اطلب نوع الجهاز ونظام التشغيل وإصدار التطبيق.",
+        "تأكد من أن العميل يستخدم أحدث إصدار من التطبيق ولديه اتصال مستقر.",
+        "إذا استمرت المشكلة بعد الفحوصات الأساسية، قم برفع طلب إلى الدعم الفني مع كل البيانات."
+      ],
+      escalationConditions:"يتم رفع الطلب إذا استمرت المشكلة بعد التأكد من تحديث التطبيق واستقرار الاتصال، أو إذا بدا أن الخطأ يؤثر على أكثر من عميل.",
+      requiredInformation:["صورة من رسالة الخطأ","نوع الجهاز ونظام التشغيل","إصدار التطبيق","خطوات تكرار المشكلة"],
+      importantNotes:"لا تحاول تشخيص الأسباب المتعلقة بالخوادم بنفسك. اجمع البيانات وقم بالتصعيد."
+    }
+  },
+  {
+    id:"kb6", category:"Account", subcategory:"Transfers", type:"trouble",
+    responsibleTeam:"", raiseRequest:false,
+    status:"Active", needsClarification:false,
+    createdAt:"2026-08-05", updatedAt:"2026-08-30",
+    en:{
+      title:"Partial Internal Transfer",
+      keywords:["internal transfer","partial","between accounts","margin","free margin"],
+      exampleQuestions:[
+        "Only part of the internal transfer amount went through",
+        "Client transferred between accounts and only part of the amount moved",
+        "The internal transfer is delayed"
+      ],
+      explanation:"The client transferred funds between their own accounts and only part of the requested amount appears to have moved.",
+      internalAnswer:"Check the transaction history of both accounts for the transfer entries. This is frequently caused by a margin restriction that limits how much can be transferred out of an account holding open positions.",
+      clientResponse:"Thank you for bringing this to our attention. We are reviewing the transfer history between your accounts. In some cases, open positions can limit the transferable amount, and we will confirm the exact reason shortly.",
+      supportSteps:[
+        "Open both the source and the destination accounts.",
+        "Review the transaction history for the transfer entries and the amounts.",
+        "Check whether the source account holds open positions that limit the free margin.",
+        "If the difference is not explained by a margin restriction, escalate to the Financial Department."
+      ],
+      escalationConditions:"",
+      requiredInformation:["Source account number","Destination account number","Requested amount","Date and time of the transfer"],
+      importantNotes:"Most cases are resolved by explaining the margin restriction. Escalate only when that does not account for the difference."
+    },
+    ar:{
+      title:"تحويل داخلي جزئي",
+      keywords:["تحويل داخلي","جزئي","بين الحسابات","الهامش","الهامش الحر"],
+      exampleQuestions:[
+        "جزء فقط من مبلغ التحويل الداخلي تم تنفيذه",
+        "العميل حوّل بين حساباته وجزء فقط من المبلغ انتقل",
+        "التحويل الداخلي متأخر"
+      ],
+      explanation:"قام العميل بتحويل مبلغ بين حساباته الخاصة، ويبدو أن جزءًا فقط من المبلغ المطلوب قد تم تحويله.",
+      internalAnswer:"راجع سجل العمليات في الحسابين للاطلاع على قيود التحويل. غالبًا ما يكون السبب قيدًا على الهامش (Margin) يحدّ من المبلغ القابل للتحويل من حساب يحتوي على صفقات مفتوحة.",
+      clientResponse:"شكرًا لتنبيهنا إلى هذا الأمر. نقوم حاليًا بمراجعة سجل التحويلات بين حساباتك. في بعض الحالات قد تؤدي الصفقات المفتوحة إلى تحديد المبلغ القابل للتحويل، وسنؤكد لك السبب الدقيق قريبًا.",
+      supportSteps:[
+        "افتح الحساب المُحوَّل منه والحساب المُحوَّل إليه.",
+        "راجع سجل العمليات للاطلاع على قيود التحويل والمبالغ.",
+        "تحقق مما إذا كان الحساب المصدر يحتوي على صفقات مفتوحة تحدّ من الهامش الحر.",
+        "إذا لم يكن الفرق ناتجًا عن قيود الهامش، قم برفع طلب إلى القسم المالي."
+      ],
+      escalationConditions:"",
+      requiredInformation:["رقم الحساب المُحوَّل منه","رقم الحساب المُحوَّل إليه","المبلغ المطلوب","تاريخ ووقت التحويل"],
+      importantNotes:"تُحل معظم الحالات بشرح قيود الهامش للعميل. لا تقم بالتصعيد إلا إذا كان ذلك لا يفسر الفرق."
+    }
+  }
+];
+
+/* Quality rules: selected parts of the Knowledge Base that the employee
+   is evaluated against. One knowledge item can carry many rules.
+   Evaluation fields (score, reviewer, result) are intentionally absent
+   but the shape allows adding an `evaluations: []` array later. */
+let qualityRules = [
+  {
+    id:"q1", knowledgeId:"kb2", category:"Withdrawals", priority:"Critical", status:"Active",
+    createdAt:"2026-09-01",
+    en:{ title:"Verify withdrawal status before responding",
+         requirement:"The employee must provide the client with accurate information about the current withdrawal status.",
+         expectedAction:"Open the client's account and check the actual withdrawal status in the system before sending any reply.",
+         rule:"The employee must not answer a withdrawal enquiry from memory or assumption without checking the request in the system.",
+         notes:"" },
+    ar:{ title:"التحقق من حالة السحب قبل الرد",
+         requirement:"يجب على الموظف تزويد العميل بمعلومات دقيقة عن حالة طلب السحب الحالية.",
+         expectedAction:"فتح حساب العميل والتحقق من الحالة الفعلية لطلب السحب في النظام قبل إرسال أي رد.",
+         rule:"لا يجوز للموظف الرد على استفسار خاص بالسحب اعتمادًا على الذاكرة أو الافتراض دون مراجعة الطلب في النظام.",
+         notes:"" }
+  },
+  {
+    id:"q2", knowledgeId:"kb2", category:"Withdrawals", priority:"Critical", status:"Active",
+    createdAt:"2026-09-01",
+    en:{ title:"Do not promise an unconfirmed processing time",
+         requirement:"The employee must not commit to a processing or release time that is not confirmed in the system.",
+         expectedAction:"Refer only to the status displayed in the system and avoid giving the client any specific timeframe.",
+         rule:"Promising a processing time that is not documented in the Knowledge Base is considered a critical quality breach.",
+         notes:"" },
+    ar:{ title:"عدم الوعد بمدة تنفيذ غير مؤكدة",
+         requirement:"يجب ألا يلتزم الموظف بمدة تنفيذ أو إفراج غير مؤكدة في النظام.",
+         expectedAction:"الاعتماد فقط على الحالة الظاهرة في النظام وتجنب إعطاء العميل أي مدة زمنية محددة.",
+         rule:"الوعد بمدة تنفيذ غير موثقة في قاعدة المعرفة يُعد مخالفة جودة حرجة.",
+         notes:"" }
+  },
+  {
+    id:"q3", knowledgeId:"kb2", category:"Withdrawals", priority:"High", status:"Active",
+    createdAt:"2026-09-01",
+    en:{ title:"Collect required information before escalation",
+         requirement:"The employee must collect all required information before raising a request.",
+         expectedAction:"Obtain the withdrawal request ID, the amount, the submission date, and the payment method before escalating.",
+         rule:"A request raised without the complete required information is considered an incomplete escalation.",
+         notes:"" },
+    ar:{ title:"جمع البيانات المطلوبة قبل التصعيد",
+         requirement:"يجب على الموظف جمع كل البيانات المطلوبة قبل رفع الطلب.",
+         expectedAction:"الحصول على رقم طلب السحب والمبلغ وتاريخ التقديم ووسيلة الدفع قبل التصعيد.",
+         rule:"رفع الطلب دون استكمال البيانات المطلوبة يُعد تصعيدًا غير مكتمل.",
+         notes:"" }
+  },
+  {
+    id:"q4", knowledgeId:"kb1", category:"Deposits", priority:"High", status:"Active",
+    createdAt:"2026-09-02",
+    en:{ title:"Verify the transaction on-chain before escalating",
+         requirement:"The employee must verify the deposit on the blockchain explorer before raising a request.",
+         expectedAction:"Take the TXID from the client and confirm the transaction status on the relevant blockchain explorer.",
+         rule:"A deposit must not be escalated to the Financial Department before its on-chain status has been verified.",
+         notes:"" },
+    ar:{ title:"التحقق من العملية على الشبكة قبل التصعيد",
+         requirement:"يجب على الموظف التحقق من الإيداع على مستكشف البلوك تشين قبل رفع الطلب.",
+         expectedAction:"أخذ رقم العملية (TXID) من العميل والتأكد من حالة العملية على مستكشف الشبكة المعني.",
+         rule:"لا يجوز تصعيد أي إيداع إلى القسم المالي قبل التحقق من حالته على الشبكة.",
+         notes:"" }
+  },
+  {
+    id:"q5", knowledgeId:"kb3", category:"Verification", priority:"Medium", status:"Active",
+    createdAt:"2026-09-03",
+    en:{ title:"Do not guarantee a verification outcome",
+         requirement:"The employee must not guarantee to the client that the documents will be approved.",
+         expectedAction:"Explain the current status and the next step without predicting the final decision.",
+         rule:"The final decision on document validity belongs to Compliance and must not be pre-empted by Support.",
+         notes:"" },
+    ar:{ title:"عدم ضمان نتيجة التوثيق",
+         requirement:"يجب ألا يضمن الموظف للعميل الموافقة على المستندات.",
+         expectedAction:"شرح الحالة الحالية والخطوة التالية دون التنبؤ بالقرار النهائي.",
+         rule:"القرار النهائي بشأن صحة المستندات يعود لقسم الالتزام ولا يجوز لفريق الدعم استباقه.",
+         notes:"" }
+  }
+];
+
+/* Quality error classifications — the catalogue of mistakes an agent can
+   make, with an explanation of each. Read-only for agents, managed by an
+   Admin. Bilingual like every other content entity. */
+let qualityErrors = [
+  {
+    id:"qe1", code:"QE-01", severity:"Critical", category:"Procedure", status:"Active", createdAt:"2026-09-01",
+    en:{ title:"Required step not followed",
+         description:"The agent did not carry out a step that the documented procedure requires before responding to or resolving the client's case.",
+         example:"The agent answered a withdrawal enquiry without opening the account and checking the actual request status in the system.",
+         impact:"The client may receive inaccurate information, and the case may be handled on the basis of an assumption rather than the recorded status." },
+    ar:{ title:"عدم تنفيذ خطوة مطلوبة",
+         description:"لم ينفّذ الموظف خطوة يفرضها الإجراء الموثّق قبل الرد على العميل أو إنهاء الحالة.",
+         example:"رد الموظف على استفسار خاص بالسحب دون فتح الحساب والتحقق من حالة الطلب الفعلية في النظام.",
+         impact:"قد يحصل العميل على معلومات غير دقيقة، وقد يتم التعامل مع الحالة بناءً على افتراض بدلًا من الحالة المسجلة." }
+  },
+  {
+    id:"qe2", code:"QE-02", severity:"High", category:"Communication", status:"Active", createdAt:"2026-09-01",
+    en:{ title:"Required instructions not sent to the client",
+         description:"The agent did not send the client the steps or instructions that the procedure requires them to send.",
+         example:"The agent did not send the client the list of details needed to review a failed deposit, so the case stalled pending information.",
+         impact:"The case is delayed, the client contacts support again, and handling time increases without progress." },
+    ar:{ title:"عدم إرسال التعليمات المطلوبة للعميل",
+         description:"لم يرسل الموظف إلى العميل الخطوات أو التعليمات التي يفرض الإجراء إرسالها.",
+         example:"لم يرسل الموظف للعميل قائمة البيانات اللازمة لمراجعة إيداع فاشل، فتوقفت الحالة في انتظار المعلومات.",
+         impact:"تتأخر الحالة ويعاود العميل التواصل مع الدعم، ويزيد زمن المعالجة دون تقدم فعلي." }
+  },
+  {
+    id:"qe3", code:"QE-03", severity:"Critical", category:"Information Accuracy", status:"Active", createdAt:"2026-09-02",
+    en:{ title:"Inaccurate or unconfirmed information given",
+         description:"The agent gave the client information that is not documented in the Knowledge Base, such as a processing time, a fee, or an outcome that has not been confirmed.",
+         example:"The agent told the client that the withdrawal would be released within a specific number of hours, although no such timeframe is documented.",
+         impact:"An expectation is created that the company has not committed to, which leads to complaints and loss of trust." },
+    ar:{ title:"تقديم معلومات غير دقيقة أو غير مؤكدة",
+         description:"قدّم الموظف للعميل معلومة غير موثقة في قاعدة المعرفة، مثل مدة تنفيذ أو رسوم أو نتيجة غير مؤكدة.",
+         example:"أبلغ الموظف العميل بأن السحب سيتم تنفيذه خلال عدد محدد من الساعات رغم عدم وجود مدة موثقة.",
+         impact:"يتكوّن لدى العميل توقع لم تلتزم به الشركة، ما يؤدي إلى شكاوى وفقدان الثقة." }
+  },
+  {
+    id:"qe4", code:"QE-04", severity:"High", category:"Escalation", status:"Active", createdAt:"2026-09-02",
+    en:{ title:"Incomplete escalation",
+         description:"The agent raised a request to another team without collecting all the information that the procedure requires beforehand.",
+         example:"A deposit case was escalated to the Financial Department without the transaction ID or the network used.",
+         impact:"The receiving team returns the request, and resolution is delayed for a reason that could have been avoided." },
+    ar:{ title:"تصعيد غير مكتمل",
+         description:"رفع الموظف طلبًا إلى فريق آخر دون جمع كل البيانات التي يفرض الإجراء جمعها مسبقًا.",
+         example:"تم تصعيد حالة إيداع إلى القسم المالي دون رقم العملية أو الشبكة المستخدمة.",
+         impact:"يُعيد الفريق المستلم الطلب، ويتأخر الحل لسبب كان يمكن تفاديه." }
+  },
+  {
+    id:"qe5", code:"QE-05", severity:"Medium", category:"Escalation", status:"Active", createdAt:"2026-09-03",
+    en:{ title:"Escalation raised without meeting the condition",
+         description:"The agent raised a request although the escalation condition documented for the case had not been met.",
+         example:"A deposit was escalated before verifying the transaction status on the blockchain explorer.",
+         impact:"Unnecessary load is added to the specialised teams and the queue for genuine cases grows." },
+    ar:{ title:"رفع طلب دون تحقق شرط التصعيد",
+         description:"رفع الموظف طلبًا رغم أن شرط التصعيد الموثّق للحالة لم يتحقق بعد.",
+         example:"تم تصعيد إيداع قبل التحقق من حالة العملية على مستكشف البلوك تشين.",
+         impact:"يُضاف عبء غير ضروري على الفرق المختصة وتطول قائمة انتظار الحالات الفعلية." }
+  },
+  {
+    id:"qe6", code:"QE-06", severity:"Low", category:"Communication", status:"Active", createdAt:"2026-09-03",
+    en:{ title:"Unprofessional wording",
+         description:"The reply reached the client with wording that does not match the approved tone, or with spelling and clarity issues.",
+         example:"A reply was sent as a short, abrupt sentence without a greeting or an explanation of the next step.",
+         impact:"The service is perceived as lower in quality even when the information itself is correct." },
+    ar:{ title:"صياغة غير احترافية",
+         description:"وصل الرد إلى العميل بصياغة لا تتوافق مع الأسلوب المعتمد، أو بها أخطاء إملائية أو غموض.",
+         example:"تم إرسال الرد في جملة قصيرة ومقتضبة دون تحية أو توضيح للخطوة التالية.",
+         impact:"تنخفض الصورة المهنية للخدمة حتى لو كانت المعلومة نفسها صحيحة." }
+  }
+];
+
+/* Users now live in Supabase (auth.users + public.profiles), not here.
+   This array is just a runtime cache, populated by fetchProfiles() after
+   login. Creating/deleting accounts happens in the Supabase Dashboard for
+   now (Authentication → Users) since that needs privileged access this
+   frontend intentionally never holds — see the setup notes. */
+let users = [];
+
+/* searchHistory and favoritesByUser are now runtime caches loaded from
+   Supabase's own `search_history` and `favorites` tables (each protected
+   by Row Level Security so a user only ever gets their own rows back —
+   an admin's broader view still comes through the same RLS policy, not
+   a client-side filter). They are NOT part of the shared kb_data blob
+   below, precisely so an employee reading that shared document can never
+   see another employee's private search/favorites data. */
+let searchHistory = [];
+let favoritesByUser = {};
+let missingRequests = [];
+let settings = { defaultLanguage:"en", appName:"Support Knowledge Base" };
+
+/* IDs must stay unique across every device/session, forever — not just
+   within one page load. A simple incrementing counter (the old approach)
+   resets to the same starting number every time the page reloads, so two
+   items created in different sessions could easily end up with the exact
+   same id, silently merging them in the UI (editing one would show the
+   other's data). Timestamp + a random suffix makes a collision practically
+   impossible without needing to track any shared counter. */
+function nextId(p){
+  return p + Date.now().toString(36) + Math.random().toString(36).slice(2,9);
+}
+
+/* ============================== 2. I18N ============================== */
+const translations = {
+en:{
+  appName:"Support Knowledge Base", appSub:"Internal Support Tool",
+  workspace:"Workspace", administration:"Administration",
+  navSearch:"Search", navFavorites:"Favorites", navHistory:"History",
+  back:"Back",
+  navDashboard:"Dashboard", navKnowledge:"Knowledge Base", navQuality:"Quality", navUsers:"Users",
+  navCategories:"Categories", navTeams:"Teams", navSearchHistory:"Search History",
+  navMissing:"Missing Knowledge", navStatistics:"Statistics", navSettings:"Settings",
+  roleAdmin:"Administrator", roleEmployee:"Support Agent",
+  logout:"Sign out",
+  loginTitle:"Sign in", loginSub:"Enter the credentials provided by your administrator.",
+  username:"Username", password:"Password",
+  usernamePlaceholder:"Enter your username", passwordPlaceholder:"Enter your password",
+  signIn:"Sign in", show:"Show", hide:"Hide",
+  loginFailed:"The username or password is incorrect.",
+  loginLocked:"Too many attempts. Try again in {s}s.",
+  manageInDashboard:"For now, do this from the Supabase Dashboard → Authentication → Users (creating accounts and password resets need privileged access this app intentionally doesn't hold).",
+  accountInactive:"This account has been deactivated. Please contact your administrator.",
+  accessDenied:"You do not have permission to access this page.",
+  heroTitle:"How can I help you today?",
+  heroSub:"Search for a customer issue in your own words. Both Arabic and English are supported.",
+  searchPlaceholder:"Search for a customer issue...", search:"Search",
+  all:"All", active:"Active", inactive:"Inactive",
+  bestMatch:"Best match", otherMatches:"Other possible matches", view:"View",
+  noMatchTitle:"No matching procedure found",
+  noMatchSub:"Try different keywords, or contact the relevant team.",
+  reportMissing:"Report missing knowledge",
+  explanation:"Explanation", clientResponseHeader:"What should I tell the client?",
+  copyResponse:"Copy response", internalAnswer:"Internal answer", copy:"Copy",
+  supportSteps:"Support steps", noSteps:"No steps recorded.",
+  escalation:"Escalation", raiseRequest:"Raise a request:", yes:"Yes", no:"No",
+  responsibleTeam:"Responsible team:", whenToRaise:"When to raise:",
+  requiredInformation:"Required information", noneSpecified:"None specified.",
+  importantNotes:"Important notes",
+  qualityRequirements:"Quality requirements you are evaluated on",
+  qualityRequirement:"Requirement", qualityExpectedAction:"Expected action", qualityRule:"Rule",
+  copied:"Copied to clipboard", addedFav:"Added to favorites", removedFav:"Removed from favorites",
+  reported:"Reported. Thank you for flagging this.",
+  favTitle:"Favorites", favSub:"The topics you use most often, saved for quick access.",
+  noFavorites:"You have no saved favorites yet. Save a topic from any search result.",
+  historyTitle:"Search History", historySub:"Every search performed, along with the result it returned.",
+  filterHistory:"Filter history...",
+  colSearch:"Search", colResult:"Result", colCategory:"Category", colTeam:"Team",
+  colEmployee:"Agent", colDate:"Date", colTime:"Time", colTitle:"Title", colType:"Type",
+  colStatus:"Status", colUpdated:"Last updated", colActions:"Actions", colPriority:"Priority",
+  colKnowledge:"Knowledge item", colUsername:"Username", colRole:"Role", colCreated:"Created",
+  colLastLogin:"Last login", colQuestion:"Question", colCount:"Searches", colName:"Name",
+  noSearches:"No searches have been recorded yet.", noMatchInline:"No match found",
+  adminDashboard:"Dashboard", adminDashboardSub:"An overview of the knowledge base and support activity.",
+  totalKnowledge:"Knowledge items", totalSearches:"Total searches",
+  totalQuality:"Quality rules", criticalRules:"Critical rules",
+  missingPending:"Pending knowledge gaps", activeUsers:"Active users",
+  mostSearched:"Most searched topics", mostUsedCategories:"Most used categories",
+  mostActiveAgents:"Most active agents", knowledgeGaps:"Reported knowledge gaps",
+  noData:"No data yet.", nothingReported:"Nothing has been reported yet.",
+  knowledgeTitle:"Knowledge Base",
+  knowledgeSub:"The central repository for all support information — procedures, policies, rules and internal notes.",
+  knowledgeIntro:"This is the single source of truth for the support team. Any type of information can be stored here — it is not limited to questions and answers. Selected parts of it can then be marked as Quality requirements.",
+  filterItems:"Filter items...", addKnowledge:"Add knowledge item",
+  noItems:"No knowledge items found.",
+  edit:"Edit", del:"Delete", activate:"Activate", deactivate:"Deactivate",
+  addKnowledgeTitle:"Add knowledge item", editKnowledgeTitle:"Edit knowledge item",
+  generalInfo:"General information",
+  generalInfoDesc:"Language-independent settings that apply to both versions of this item.",
+  englishVersion:"English version", arabicVersion:"Arabic version",
+  englishVersionDesc:"Shown to agents working in English.",
+  arabicVersionDesc:"Shown to agents working in Arabic.",
+  fTitle:"Title", fCategory:"Category", fSubcategory:"Subcategory", fType:"Type", fStatus:"Status",
+  fKeywords:"Keywords", hintComma:"(separated by commas)",
+  fExampleQuestions:"Example customer questions", hintPerLine:"(one per line)",
+  fExplanation:"Explanation", fInternalAnswer:"Internal answer",
+  hintInternal:"(what the agent needs to know)",
+  fClientResponse:"Client response", hintClient:"(a reply ready to send)",
+  fSupportSteps:"Support steps", hintOrdered:"(one step per line, in order)",
+  fEscalationConditions:"Escalation conditions", hintWhen:"(when a request should be raised)",
+  fRequiredInformation:"Required information", hintItemPerLine:"(one item per line)",
+  fImportantNotes:"Important notes",
+  raiseRequestLabel:"Requires escalation",
+  raiseRequestHint:"Does this issue need to be escalated to another team?",
+  needsClarification:"Needs clarification",
+  needsClarificationHint:"Flag this item as unclear so it can be reviewed later.",
+  needsClarificationFlag:"Needs clarification",
+  addToQuality:"Add to quality evaluation?",
+  addToQualityHint:"Create a quality requirement linked to this knowledge item.",
+  cancel:"Cancel", save:"Save", saveItem:"Save knowledge item",
+  titleRequired:"An English or Arabic title is required.",
+  itemAdded:"Knowledge item added.", itemUpdated:"Knowledge item updated.",
+  itemDeleted:"Knowledge item deleted.",
+  deleteItemTitle:"Delete this knowledge item?",
+  deleteItemBody:"This will permanently remove the item and all quality rules linked to it. This action cannot be undone.",
+  qualityTitle:"Quality", qualitySub:"The requirements that agents are evaluated against.",
+  qualityIntro:"Quality rules are drawn from the Knowledge Base. Not every piece of information becomes a quality requirement — only the parts an agent must follow and can be measured on. One knowledge item can have several rules.",
+  addQualityRule:"Add quality rule",
+  addQualityTitle:"Add quality rule", editQualityTitle:"Edit quality rule",
+  noQualityRules:"No quality rules have been created yet.",
+  fRelatedKnowledge:"Related knowledge item", fRequirement:"Requirement",
+  fExpectedAction:"Expected agent action", fQualityRule:"Quality rule", fPriority:"Priority",
+  fNotes:"Notes",
+  hintRequirement:"(what the agent must achieve)",
+  hintExpectedAction:"(the concrete action expected)",
+  hintQualityRule:"(what counts as a breach)",
+  priorityCritical:"Critical", priorityHigh:"High", priorityMedium:"Medium", priorityLow:"Low",
+  ruleAdded:"Quality rule added.", ruleUpdated:"Quality rule updated.", ruleDeleted:"Quality rule deleted.",
+  deleteRuleTitle:"Delete this quality rule?",
+  deleteRuleBody:"The rule will be permanently removed. The linked knowledge item will not be affected.",
+  qualityRequiredFields:"A title and a related knowledge item are required.",
+  rulesByCategory:"Rules by category", rulesByKnowledge:"Rules by knowledge item",
+  usersTitle:"Users", usersSub:"Accounts are created here. There is no self sign-up.",
+  addUser:"Add user", addUserTitle:"Add user", editUserTitle:"Edit user",
+  noUsers:"No user accounts yet.",
+  fRole:"Role", resetPassword:"Reset password",
+  resetPasswordTitle:"Reset password", resetPasswordBody:"Enter a new password for this account.",
+  newPassword:"New password",
+  userAdded:"User account created.", userUpdated:"User account updated.",
+  userDeleted:"User account deleted.", passwordReset:"Password has been reset.",
+  usernameRequired:"A username and password are required.",
+  usernameTaken:"This username is already in use.",
+  cannotDeleteSelf:"You cannot delete the account you are signed in with.",
+  cannotDeactivateSelf:"You cannot deactivate the account you are signed in with.",
+  lastAdminWarning:"At least one active administrator account must remain.",
+  deleteUserTitle:"Delete this user account?",
+  deleteUserBody:"This account will no longer be able to sign in. This action cannot be undone.",
+  never:"Never",
+  categoriesTitle:"Categories", categoriesSub:"Used to organise knowledge items.",
+  teamsTitle:"Teams", teamsSub:"The teams that escalated requests are routed to.",
+  typesTitle:"Knowledge types", typesSub:"The kinds of information the knowledge base can hold.",
+  addCategoryPlaceholder:"Add a new category...", addTeamPlaceholder:"Add a new team...",
+  addTypePlaceholder:"Add a new type...",
+  addCategory:"Add category", addTeam:"Add team", addType:"Add type",
+  noCategories:"No categories yet.", noTeams:"No teams yet.",
+  alreadyExists:"This entry already exists.", added:"Added.", updated:"Updated.", removed:"Removed.",
+  missingTitle:"Missing Knowledge", missingSub:"Questions agents searched for without finding an answer.",
+  noMissing:"No knowledge gaps have been reported yet.",
+  markAdded:"Mark as added", ignore:"Ignore",
+  statusPending:"Pending", statusAdded:"Added", statusIgnored:"Ignored",
+  markedAs:"Marked as",
+  statsTitle:"Statistics", statsSub:"How the knowledge base is being used.",
+  settingsTitle:"Settings", settingsSub:"General configuration for the application.",
+  defaultLanguage:"Default interface language",
+  defaultLanguageHint:"The language new sessions start in.",
+  english:"English", arabic:"Arabic",
+  demoNotice:"Demo data — for demonstration only and not official company policy.",
+  securityNotice:"Accounts and passwords are managed in Supabase Auth (Dashboard → Authentication). Role/status changes made here are saved for real, protected by database-level Row Level Security.",
+  settingsSaved:"Settings saved.",
+  typeLabel:"Type", knowledgeItemLabel:"Knowledge item", none:"None",
+  navQualityErrors:"Quality Errors",
+  qualityErrorsTitle:"Quality Errors Classification",
+  qualityErrorsSub:"The types of quality errors and what each one means.",
+  qualityErrorsIntroAgent:"These are the error types your work is assessed against. Read them so you know what each classification covers and how to avoid it.",
+  qualityErrorsIntroAdmin:"Define the error types used to classify quality issues. Every change here appears for all agents.",
+  addQualityError:"Add error type",
+  addQualityErrorTitle:"Add error type", editQualityErrorTitle:"Edit error type",
+  noQualityErrors:"No error types have been defined yet.",
+  fErrorCode:"Code", fSeverity:"Severity", fErrorDescription:"Description",
+  fErrorExample:"Example", fErrorImpact:"Impact",
+  hintErrorCode:"(a short reference such as QE-01)",
+  hintErrorDescription:"(what this error means)",
+  hintErrorExample:"(a situation that falls under it)",
+  hintErrorImpact:"(the consequence of the error)",
+  errorAdded:"Error type added.", errorUpdated:"Error type updated.", errorDeleted:"Error type deleted.",
+  deleteErrorTitle:"Delete this error type?",
+  deleteErrorBody:"The classification will be permanently removed. This action cannot be undone.",
+  errorRequiredFields:"A code and a title are required.",
+  colCode:"Code", colSeverity:"Severity", filterErrors:"Filter error types...",
+  errorsBySeverity:"Error types by severity", totalErrorTypes:"Error types",
+  description:"Description", example:"Example", impact:"Impact",
+  syncLive:"Synced", syncLocal:"This device only", syncChecking:"Checking...",
+  syncLiveHint:"Changes are shared with everyone using this application.",
+  syncLocalHint:"No shared storage is available here, so changes stay on this device only.",
+  syncNow:"Sync now", syncUpdated:"Updated with the latest changes.", syncDone:"Up to date.",
+  syncSection:"Data synchronisation", syncStatus:"Status"
+},
+ar:{
+  appName:"قاعدة معرفة الدعم", appSub:"أداة الدعم الداخلية",
+  workspace:"مساحة العمل", administration:"الإدارة",
+  navSearch:"البحث", navFavorites:"المفضلة", navHistory:"السجل",
+  back:"رجوع",
+  navDashboard:"لوحة المعلومات", navKnowledge:"قاعدة المعرفة", navQuality:"الجودة", navUsers:"المستخدمون",
+  navCategories:"التصنيفات", navTeams:"الفرق", navSearchHistory:"سجل البحث",
+  navMissing:"المعرفة الناقصة", navStatistics:"الإحصائيات", navSettings:"الإعدادات",
+  roleAdmin:"مدير النظام", roleEmployee:"موظف دعم",
+  logout:"تسجيل الخروج",
+  loginTitle:"تسجيل الدخول", loginSub:"أدخل بيانات الدخول التي زوّدك بها مدير النظام.",
+  username:"اسم المستخدم", password:"كلمة المرور",
+  usernamePlaceholder:"أدخل اسم المستخدم", passwordPlaceholder:"أدخل كلمة المرور",
+  signIn:"تسجيل الدخول", show:"إظهار", hide:"إخفاء",
+  loginFailed:"اسم المستخدم أو كلمة المرور غير صحيحة.",
+  loginLocked:"محاولات كتير غلط. حاول تاني بعد {s} ثانية.",
+  manageInDashboard:"دلوقتي ده بيتعمل من Supabase Dashboard ← Authentication ← Users (إنشاء حسابات جديدة وإعادة تعيين الباسورد محتاجين صلاحية عالية مش مفروض تكون موجودة في الواجهة الأمامية أصلًا).",
+  accountInactive:"تم تعطيل هذا الحساب. يرجى التواصل مع مدير النظام.",
+  accessDenied:"لا تملك صلاحية الوصول إلى هذه الصفحة.",
+  heroTitle:"كيف يمكنني مساعدتك اليوم؟",
+  heroSub:"ابحث عن مشكلة العميل بأسلوبك الطبيعي. البحث يدعم العربية والإنجليزية.",
+  searchPlaceholder:"ابحث عن مشكلة العميل...", search:"بحث",
+  all:"الكل", active:"مفعّل", inactive:"معطّل",
+  bestMatch:"أفضل نتيجة", otherMatches:"نتائج محتملة أخرى", view:"عرض",
+  noMatchTitle:"لا يوجد إجراء مطابق",
+  noMatchSub:"جرّب كلمات بحث مختلفة، أو تواصل مع الفريق المختص.",
+  reportMissing:"الإبلاغ عن معلومة ناقصة",
+  explanation:"شرح المشكلة", clientResponseHeader:"ما الذي أقوله للعميل؟",
+  copyResponse:"نسخ الرد", internalAnswer:"الإجابة الداخلية", copy:"نسخ",
+  supportSteps:"خطوات التعامل", noSteps:"لا توجد خطوات مسجلة.",
+  escalation:"التصعيد", raiseRequest:"رفع طلب:", yes:"نعم", no:"لا",
+  responsibleTeam:"الفريق المسؤول:", whenToRaise:"متى يتم رفع الطلب:",
+  requiredInformation:"البيانات المطلوبة", noneSpecified:"لا توجد بيانات محددة.",
+  importantNotes:"ملاحظات مهمة",
+  qualityRequirements:"متطلبات الجودة التي يتم تقييمك عليها",
+  qualityRequirement:"المطلوب", qualityExpectedAction:"الإجراء المتوقع", qualityRule:"قاعدة الجودة",
+  copied:"تم النسخ", addedFav:"تمت الإضافة إلى المفضلة", removedFav:"تمت الإزالة من المفضلة",
+  reported:"تم الإبلاغ. شكرًا لتنبيهنا.",
+  favTitle:"المفضلة", favSub:"الموضوعات التي تستخدمها كثيرًا، محفوظة للوصول السريع.",
+  noFavorites:"لا توجد عناصر في المفضلة بعد. يمكنك حفظ أي موضوع من نتيجة البحث.",
+  historyTitle:"سجل البحث", historySub:"كل عملية بحث تمت، مع النتيجة التي ظهرت.",
+  filterHistory:"تصفية السجل...",
+  colSearch:"البحث", colResult:"النتيجة", colCategory:"التصنيف", colTeam:"الفريق",
+  colEmployee:"الموظف", colDate:"التاريخ", colTime:"الوقت", colTitle:"العنوان", colType:"النوع",
+  colStatus:"الحالة", colUpdated:"آخر تحديث", colActions:"الإجراءات", colPriority:"الأولوية",
+  colKnowledge:"عنصر المعرفة", colUsername:"اسم المستخدم", colRole:"الصلاحية", colCreated:"تاريخ الإنشاء",
+  colLastLogin:"آخر دخول", colQuestion:"السؤال", colCount:"عدد عمليات البحث", colName:"الاسم",
+  noSearches:"لم يتم تسجيل أي عملية بحث بعد.", noMatchInline:"لا توجد نتيجة",
+  adminDashboard:"لوحة المعلومات", adminDashboardSub:"نظرة عامة على قاعدة المعرفة ونشاط الدعم.",
+  totalKnowledge:"عناصر المعرفة", totalSearches:"إجمالي عمليات البحث",
+  totalQuality:"قواعد الجودة", criticalRules:"القواعد الحرجة",
+  missingPending:"فجوات معرفية قيد المراجعة", activeUsers:"المستخدمون النشطون",
+  mostSearched:"أكثر الموضوعات بحثًا", mostUsedCategories:"أكثر التصنيفات استخدامًا",
+  mostActiveAgents:"أكثر الموظفين نشاطًا", knowledgeGaps:"الفجوات المعرفية المُبلَّغ عنها",
+  noData:"لا توجد بيانات بعد.", nothingReported:"لم يتم الإبلاغ عن أي شيء بعد.",
+  knowledgeTitle:"قاعدة المعرفة",
+  knowledgeSub:"المرجع المركزي لكل معلومات الدعم — الإجراءات والسياسات والقواعد والملاحظات الداخلية.",
+  knowledgeIntro:"هذه هي المرجعية الأساسية لفريق الدعم. يمكن حفظ أي نوع من المعلومات هنا، فهي ليست مقتصرة على الأسئلة والأجوبة. ويمكن بعد ذلك تحديد أجزاء منها كمتطلبات جودة.",
+  filterItems:"تصفية العناصر...", addKnowledge:"إضافة عنصر معرفة",
+  noItems:"لا توجد عناصر معرفة.",
+  edit:"تعديل", del:"حذف", activate:"تفعيل", deactivate:"تعطيل",
+  addKnowledgeTitle:"إضافة عنصر معرفة", editKnowledgeTitle:"تعديل عنصر المعرفة",
+  generalInfo:"المعلومات العامة",
+  generalInfoDesc:"إعدادات مشتركة لا تتعلق بلغة معينة وتنطبق على النسختين.",
+  englishVersion:"النسخة الإنجليزية", arabicVersion:"النسخة العربية",
+  englishVersionDesc:"تظهر للموظفين الذين يعملون باللغة الإنجليزية.",
+  arabicVersionDesc:"تظهر للموظفين الذين يعملون باللغة العربية.",
+  fTitle:"العنوان", fCategory:"التصنيف", fSubcategory:"التصنيف الفرعي", fType:"النوع", fStatus:"الحالة",
+  fKeywords:"الكلمات المفتاحية", hintComma:"(مفصولة بفواصل)",
+  fExampleQuestions:"أمثلة على أسئلة العملاء", hintPerLine:"(سؤال في كل سطر)",
+  fExplanation:"شرح المشكلة", fInternalAnswer:"الإجابة الداخلية",
+  hintInternal:"(ما يحتاج الموظف إلى معرفته)",
+  fClientResponse:"الرد على العميل", hintClient:"(رد جاهز للإرسال)",
+  fSupportSteps:"خطوات التعامل", hintOrdered:"(خطوة في كل سطر، بالترتيب)",
+  fEscalationConditions:"شروط التصعيد", hintWhen:"(متى يجب رفع الطلب)",
+  fRequiredInformation:"البيانات المطلوبة", hintItemPerLine:"(بيان في كل سطر)",
+  fImportantNotes:"ملاحظات مهمة",
+  raiseRequestLabel:"يتطلب تصعيدًا",
+  raiseRequestHint:"هل تحتاج هذه المشكلة إلى تصعيد لفريق آخر؟",
+  needsClarification:"يحتاج إلى توضيح",
+  needsClarificationHint:"ضع علامة على هذا العنصر لمراجعته لاحقًا لعدم وضوحه.",
+  needsClarificationFlag:"يحتاج إلى توضيح",
+  addToQuality:"إضافة إلى تقييم الجودة؟",
+  addToQualityHint:"إنشاء متطلب جودة مرتبط بعنصر المعرفة هذا.",
+  cancel:"إلغاء", save:"حفظ", saveItem:"حفظ عنصر المعرفة",
+  titleRequired:"يجب إدخال عنوان بالإنجليزية أو بالعربية.",
+  itemAdded:"تمت إضافة عنصر المعرفة.", itemUpdated:"تم تحديث عنصر المعرفة.",
+  itemDeleted:"تم حذف عنصر المعرفة.",
+  deleteItemTitle:"حذف عنصر المعرفة؟",
+  deleteItemBody:"سيؤدي هذا إلى حذف العنصر نهائيًا مع كل قواعد الجودة المرتبطة به. لا يمكن التراجع عن هذا الإجراء.",
+  qualityTitle:"الجودة", qualitySub:"المتطلبات التي يتم تقييم الموظفين على أساسها.",
+  qualityIntro:"قواعد الجودة مستمدة من قاعدة المعرفة. ليست كل معلومة تتحول إلى متطلب جودة، بل الأجزاء التي يلتزم بها الموظف ويمكن قياسها فقط. ويمكن أن يرتبط بعنصر معرفة واحد أكثر من قاعدة.",
+  addQualityRule:"إضافة قاعدة جودة",
+  addQualityTitle:"إضافة قاعدة جودة", editQualityTitle:"تعديل قاعدة الجودة",
+  noQualityRules:"لم يتم إنشاء أي قواعد جودة بعد.",
+  fRelatedKnowledge:"عنصر المعرفة المرتبط", fRequirement:"المطلوب",
+  fExpectedAction:"الإجراء المتوقع من الموظف", fQualityRule:"قاعدة الجودة", fPriority:"الأولوية",
+  fNotes:"ملاحظات",
+  hintRequirement:"(ما يجب أن يحققه الموظف)",
+  hintExpectedAction:"(الإجراء العملي المتوقع)",
+  hintQualityRule:"(ما الذي يُعد مخالفة)",
+  priorityCritical:"حرجة", priorityHigh:"عالية", priorityMedium:"متوسطة", priorityLow:"منخفضة",
+  ruleAdded:"تمت إضافة قاعدة الجودة.", ruleUpdated:"تم تحديث قاعدة الجودة.", ruleDeleted:"تم حذف قاعدة الجودة.",
+  deleteRuleTitle:"حذف قاعدة الجودة؟",
+  deleteRuleBody:"سيتم حذف القاعدة نهائيًا. ولن يتأثر عنصر المعرفة المرتبط بها.",
+  qualityRequiredFields:"يجب إدخال العنوان وتحديد عنصر المعرفة المرتبط.",
+  rulesByCategory:"القواعد حسب التصنيف", rulesByKnowledge:"القواعد حسب عنصر المعرفة",
+  usersTitle:"المستخدمون", usersSub:"يتم إنشاء الحسابات من هنا. لا يوجد تسجيل ذاتي.",
+  addUser:"إضافة مستخدم", addUserTitle:"إضافة مستخدم", editUserTitle:"تعديل بيانات المستخدم",
+  noUsers:"لا توجد حسابات مستخدمين بعد.",
+  fRole:"الصلاحية", resetPassword:"إعادة تعيين كلمة المرور",
+  resetPasswordTitle:"إعادة تعيين كلمة المرور", resetPasswordBody:"أدخل كلمة مرور جديدة لهذا الحساب.",
+  newPassword:"كلمة المرور الجديدة",
+  userAdded:"تم إنشاء حساب المستخدم.", userUpdated:"تم تحديث حساب المستخدم.",
+  userDeleted:"تم حذف حساب المستخدم.", passwordReset:"تمت إعادة تعيين كلمة المرور.",
+  usernameRequired:"يجب إدخال اسم المستخدم وكلمة المرور.",
+  usernameTaken:"اسم المستخدم هذا مستخدم بالفعل.",
+  cannotDeleteSelf:"لا يمكنك حذف الحساب الذي سجّلت الدخول به.",
+  cannotDeactivateSelf:"لا يمكنك تعطيل الحساب الذي سجّلت الدخول به.",
+  lastAdminWarning:"يجب أن يبقى حساب مدير نظام واحد مفعّل على الأقل.",
+  deleteUserTitle:"حذف حساب المستخدم؟",
+  deleteUserBody:"لن يتمكن هذا الحساب من تسجيل الدخول بعد الآن. لا يمكن التراجع عن هذا الإجراء.",
+  never:"لم يسجّل الدخول",
+  categoriesTitle:"التصنيفات", categoriesSub:"تُستخدم في تنظيم عناصر المعرفة.",
+  teamsTitle:"الفرق", teamsSub:"الفرق التي تُحوَّل إليها الطلبات المُصعَّدة.",
+  typesTitle:"أنواع المعرفة", typesSub:"أنواع المعلومات التي يمكن أن تحتويها قاعدة المعرفة.",
+  addCategoryPlaceholder:"أضف تصنيفًا جديدًا...", addTeamPlaceholder:"أضف فريقًا جديدًا...",
+  addTypePlaceholder:"أضف نوعًا جديدًا...",
+  addCategory:"إضافة تصنيف", addTeam:"إضافة فريق", addType:"إضافة نوع",
+  noCategories:"لا توجد تصنيفات بعد.", noTeams:"لا توجد فرق بعد.",
+  alreadyExists:"هذا العنصر موجود بالفعل.", added:"تمت الإضافة.", updated:"تم التحديث.", removed:"تم الحذف.",
+  missingTitle:"المعرفة الناقصة", missingSub:"أسئلة بحث عنها الموظفون ولم يجدوا لها إجابة.",
+  noMissing:"لم يتم الإبلاغ عن أي فجوة معرفية بعد.",
+  markAdded:"تحديد كمُضافة", ignore:"تجاهل",
+  statusPending:"قيد المراجعة", statusAdded:"تمت الإضافة", statusIgnored:"تم التجاهل",
+  markedAs:"تم التحديد كـ",
+  statsTitle:"الإحصائيات", statsSub:"كيف يتم استخدام قاعدة المعرفة.",
+  settingsTitle:"الإعدادات", settingsSub:"الإعدادات العامة للتطبيق.",
+  defaultLanguage:"لغة الواجهة الافتراضية",
+  defaultLanguageHint:"اللغة التي تبدأ بها الجلسات الجديدة.",
+  english:"الإنجليزية", arabic:"العربية",
+  demoNotice:"بيانات تجريبية — لأغراض العرض فقط وليست سياسة رسمية للشركة.",
+  securityNotice:"الحسابات والباسوردات بتتدار من Supabase Auth (Dashboard ← Authentication). تعديلات الدور/الحالة هنا بتتحفظ فعليًا ومحمية بحماية على مستوى قاعدة البيانات (RLS).",
+  settingsSaved:"تم حفظ الإعدادات.",
+  typeLabel:"النوع", knowledgeItemLabel:"عنصر المعرفة", none:"لا يوجد",
+  navQualityErrors:"أخطاء الجودة",
+  qualityErrorsTitle:"تصنيف أخطاء الجودة",
+  qualityErrorsSub:"أنواع أخطاء الجودة وشرح كل نوع منها.",
+  qualityErrorsIntroAgent:"هذه هي أنواع الأخطاء التي يُقيَّم عملك على أساسها. اطّلع عليها لتعرف ما الذي يشمله كل تصنيف وكيف تتجنبه.",
+  qualityErrorsIntroAdmin:"حدد أنواع الأخطاء المستخدمة في تصنيف ملاحظات الجودة. كل تعديل هنا يظهر لجميع الموظفين.",
+  addQualityError:"إضافة نوع خطأ",
+  addQualityErrorTitle:"إضافة نوع خطأ", editQualityErrorTitle:"تعديل نوع الخطأ",
+  noQualityErrors:"لم يتم تحديد أي أنواع أخطاء بعد.",
+  fErrorCode:"الرمز", fSeverity:"درجة الخطورة", fErrorDescription:"الشرح",
+  fErrorExample:"مثال", fErrorImpact:"الأثر",
+  hintErrorCode:"(رمز مختصر مثل QE-01)",
+  hintErrorDescription:"(ما المقصود بهذا الخطأ)",
+  hintErrorExample:"(حالة تندرج تحته)",
+  hintErrorImpact:"(النتيجة المترتبة على الخطأ)",
+  errorAdded:"تمت إضافة نوع الخطأ.", errorUpdated:"تم تحديث نوع الخطأ.", errorDeleted:"تم حذف نوع الخطأ.",
+  deleteErrorTitle:"حذف نوع الخطأ؟",
+  deleteErrorBody:"سيتم حذف التصنيف نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
+  errorRequiredFields:"يجب إدخال الرمز والعنوان.",
+  colCode:"الرمز", colSeverity:"الخطورة", filterErrors:"تصفية أنواع الأخطاء...",
+  errorsBySeverity:"أنواع الأخطاء حسب الخطورة", totalErrorTypes:"أنواع الأخطاء",
+  description:"الشرح", example:"مثال", impact:"الأثر",
+  syncLive:"متزامن", syncLocal:"هذا الجهاز فقط", syncChecking:"جارٍ التحقق...",
+  syncLiveHint:"التعديلات مشتركة مع جميع مستخدمي التطبيق.",
+  syncLocalHint:"لا تتوفر مساحة تخزين مشتركة هنا، لذلك تبقى التعديلات على هذا الجهاز فقط.",
+  syncNow:"مزامنة الآن", syncUpdated:"تم التحديث بأحدث التعديلات.", syncDone:"البيانات محدّثة.",
+  syncSection:"مزامنة البيانات", syncStatus:"الحالة"
+}};
+function t(k){ const L=translations[state.lang]||translations.en; return L[k]!==undefined?L[k]:(translations.en[k]||k); }
+function otherLang(){ return state.lang==='ar' ? 'en' : 'ar'; }
+
+/* Content accessor with graceful fallback: if the item has no content in
+   the active language, fall back to the other language rather than
+   showing the agent an empty card. */
+function C(item, field){
+  if(!item) return "";
+  const cur = item[state.lang] || {};
+  const alt = item[otherLang()] || {};
+  const v = cur[field];
+  if(Array.isArray(v)) return v.length ? v : (alt[field]||[]);
+  if(v===undefined||v===null||String(v).trim()==="") return alt[field]!==undefined?alt[field]:"";
+  return v;
+}
+function typeLabel(typeId){
+  const ty = knowledgeTypes.find(x=>x.id===typeId);
+  return ty ? (ty[state.lang]||ty.en) : "";
+}
+function statusLabel(s){
+  return ({Active:t('active'),Inactive:t('inactive'),Pending:t('statusPending'),
+           Added:t('statusAdded'),Ignored:t('statusIgnored')})[s] || s;
+}
+function priorityLabel(p){
+  return ({Critical:t('priorityCritical'),High:t('priorityHigh'),
+           Medium:t('priorityMedium'),Low:t('priorityLow')})[p] || p;
+}
+function roleLabel(r){ return r==='admin'?t('roleAdmin'):t('roleEmployee'); }
+
+/* ============================= 3. AUTH / RBAC ============================= */
+/* Permissions are declared here, not inferred from which buttons happen to
+   be rendered. Every view render and every mutating action calls a guard,
+   so an employee reaching an admin view by any means is still refused
+   *through the UI*.
+   Real security now lives where it belongs: Supabase Auth verifies every
+   password server-side (nothing password-related ever touches this file),
+   and Postgres Row Level Security enforces who may read/write which rows
+   regardless of what this JS does. The guard()/can() checks below are a
+   convenience layer on top of that — they keep the UI honest and give
+   instant feedback, but the real boundary is now in the database. */
+const PERMISSIONS = {
+  admin:    ["search","favorites","history","qualityerrors","dashboard","knowledge","quality",
+             "users","categories","teams","searchhistory","missing","statistics","settings"],
+  employee: ["search","favorites","history","qualityerrors","knowledge"]
+};
+const ADMIN_ONLY_ACTIONS = ["knowledge.write","quality.write","qualityerrors.write","users.write",
+                            "categories.write","teams.write","types.write","settings.write","missing.write"];
+
+function can(view){
+  if(!state.session) return false;
+  const perms = PERMISSIONS[state.session.role] || [];
+  return perms.indexOf(view) !== -1;
+}
+/* Guard for mutating operations. Returns false and refuses silently-safely
+   if the current session lacks the role. */
+function guard(action){
+  if(!state.session){ showToast(t('accessDenied')); return false; }
+  if(ADMIN_ONLY_ACTIONS.indexOf(action) !== -1 && state.session.role !== 'admin'){
+    showToast(t('accessDenied'));
+    state.view = defaultViewFor(state.session.role);
+    render();
+    return false;
+  }
+  return true;
+}
+function defaultViewFor(role){ return role === 'admin' ? 'dashboard' : 'search'; }
+
+/* ============================== 4. STATE ============================== */
+let state = {
+  lang: settings.defaultLanguage,
+  session: null,          // {userId, name, username, role}
+  view: "login",
+  searchQuery:"", filterCategory:"All", filterTeam:"All", filterStatus:"Active",
+  lastResults:null,
+  editingItemId:null, editingRuleId:null, editingUserId:null,
+  historyFilter:"", errorFilter:"", loginError:"", modal:null,
+  editingErrorId:null, syncState:"local", lastSync:null, viewingKbId:null
+};
+
+/* ========================= 4b. SHARED DATA STORE =========================
+   The knowledge-base content (categories, teams, types, items, quality
+   rules/errors, missing requests, settings) lives in ONE row of the
+   `kb_data` Postgres table, as a jsonb column. Row Level Security only
+   lets an authenticated user READ it, and only an admin WRITE it — so
+   even someone poking the API directly with devtools cannot edit it
+   without the right role. Realtime (Postgres Changes) pushes every write
+   to every open viewer instantly.
+
+   `users`, `searchHistory` and `favoritesByUser` are deliberately NOT in
+   this blob — see the note above their declarations. */
+const KB_TABLE = "kb_data";
+let db = null;             // the Supabase client, or null if unavailable
+let kbChannel = null;
+
+function snapshot(){
+  return { categories, teams, knowledgeTypes, knowledgeItems, qualityRules,
+           qualityErrors, missingRequests, settings };
+}
+function applySnapshot(d){
+  if(!d) return;
+  if(d.categories) categories = d.categories;
+  if(d.teams) teams = d.teams;
+  if(d.knowledgeTypes) knowledgeTypes = d.knowledgeTypes;
+  if(d.knowledgeItems) knowledgeItems = d.knowledgeItems;
+  if(d.qualityRules) qualityRules = d.qualityRules;
+  if(d.qualityErrors) qualityErrors = d.qualityErrors;
+  if(d.missingRequests) missingRequests = d.missingRequests;
+  if(d.settings) settings = d.settings;
+}
+
+let lastSerialized = null;   // guards against write loops
+let persistTimer = null;
+let booted = false;
+let applyingRemote = false;  // true while an incoming row is being applied
+
+/* Called after every render. Writes only when the data actually changed,
+   so applying a remote update never bounces back as a new write. Fails
+   silently (and harmlessly) for a non-admin, since RLS refuses the write —
+   the UI already hid the editing controls from them anyway. */
+function schedulePersist(){
+  if(!booted || applyingRemote) return;
+  const ser = JSON.stringify(snapshot());
+  if(ser === lastSerialized) return;
+  lastSerialized = ser;
+  if(!db) return;
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(()=>{
+    db.from(KB_TABLE).update({ data: JSON.parse(ser) }).eq('id', 1)
+      .then(({error})=>{ if(error) console.warn('kb_data write refused:', error.message); });
+  }, 350);
+}
+
+/* Live subscription: Postgres Changes fires every time ANY viewer (this
+   one or another) updates the row. */
+function subscribeRemote(){
+  if(!db) return;
+  if(kbChannel) db.removeChannel(kbChannel);
+  kbChannel = db.channel('kb_data_changes')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: KB_TABLE, filter: 'id=eq.1' },
+      payload=>{
+        console.log('[kb realtime] change received:', payload);
+        applyingRemote = true;
+        applySnapshot(payload.new.data);
+        lastSerialized = JSON.stringify(snapshot());
+        applyingRemote = false;
+        state.lastSync = nowTimeStr();
+        if(booted) render();
+      })
+    .subscribe((status, err)=>{
+      console.log('[kb realtime] subscription status:', status, err||'');
+    });
+}
+function syncNow(){
+  if(!db){ showToast(t('syncLocalHint')); return; }
+  showToast(t('syncDone'));
+}
+
+/* ============================== 5. HELPERS ============================== */
+function esc(s){ return String(s===undefined||s===null?"":s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function nl2br(s){ return esc(s).replace(/\n/g,"<br>"); }
+function todayStr(){ return new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function nowTimeStr(){ return new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+function showToast(m){
+  const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show');
+  clearTimeout(window._tt); window._tt=setTimeout(()=>el.classList.remove('show'),2000);
+}
+function copyText(txt, btn){
+  const done=()=>{ if(btn){const o=btn.textContent; btn.textContent=t('copied'); setTimeout(()=>btn.textContent=o,1200);} showToast(t('copied')); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(done); } else done();
+}
+function findItem(id){ return knowledgeItems.find(k=>k.id===id); }
+function findRule(id){ return qualityRules.find(q=>q.id===id); }
+function findUser(id){ return users.find(u=>u.id===id); }
+function rulesFor(kid){ return qualityRules.filter(q=>q.knowledgeId===kid && q.status==='Active'); }
+function myFavorites(){
+  if(!state.session) return [];
+  if(!favoritesByUser[state.session.userId]) favoritesByUser[state.session.userId]=[];
+  return favoritesByUser[state.session.userId];
+}
+/* Loads this user's own favorites/history from Supabase. RLS guarantees
+   the query can only ever return this user's own rows, so there's no
+   client-side filtering to get wrong. */
+async function fetchMyFavorites(){
+  if(!db || !state.session) return;
+  const {data,error} = await db.from('favorites').select('item_id').eq('user_id', state.session.userId);
+  if(!error) favoritesByUser[state.session.userId] = (data||[]).map(r=>r.item_id);
+}
+async function fetchMyHistory(){
+  if(!db || !state.session) return;
+  let q = db.from('search_history').select('*').order('created_at',{ascending:false}).limit(200);
+  if(state.session.role !== 'admin') q = q.eq('user_id', state.session.userId);
+  const {data,error} = await q;
+  if(!error){
+    searchHistory = (data||[]).map(r=>({
+      id:String(r.id), query:r.query,
+      date:new Date(r.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),
+      time:new Date(r.created_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),
+      category:r.category||"—", team:r.team||"—",
+      resultId:r.result_id, resultTitle:r.result_title,
+      agent:r.agent_name||"—"
+    }));
+  }
+}
+/* Admin-only in practice: RLS on `profiles` lets anyone authenticated read
+   the list (names/roles/status are not sensitive — passwords live only in
+   Supabase Auth and are never exposed here), but only admins see this in
+   the UI (see PERMISSIONS above). */
+async function fetchProfiles(){
+  if(!db) return;
+  const {data,error} = await db.from('profiles').select('*').order('created_at',{ascending:true});
+  if(!error){
+    users = (data||[]).map(p=>({
+      id:p.id, name:p.name, username:p.username, role:p.role, status:p.status,
+      createdAt:p.created_at?new Date(p.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):"",
+      lastLogin:p.last_login?new Date(p.last_login).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+" · "+new Date(p.last_login).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):null
+    }));
+  }
+}
+function toggleSidebar(){ document.querySelector('.sidebar')?.classList.toggle('open'); }
+function closeSidebarMobile(){ document.querySelector('.sidebar')?.classList.remove('open'); }
+function setLang(l){
+  state.lang=l;
+  const r=document.getElementById('htmlRoot');
+  r.setAttribute('lang',l); r.setAttribute('dir', l==='ar'?'rtl':'ltr');
+  render();
+}
+
+/* ============================== 6. SEARCH ============================== */
+/* Scores the query against BOTH language corpora of every item, so an
+   Arabic query matches an item whose English version is displayed, and
+   vice versa. Results are shown in the user's active language.          */
+function normalize(s){
+  return String(s||"").toLowerCase()
+    .replace(/[\u0640]/g,"")                       // tatweel
+    .replace(/[\u064B-\u0652]/g,"")                // harakat
+    .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه")
+    .replace(/[؟?!.,،؛;:"'()\-\/]/g," ")
+    .replace(/\s+/g," ").trim();
+}
+const STOPWORDS = new Set(["the","and","for","that","with","this","from","client","customer",
+  "his","her","still","not","has","have","was","are","بتاع","بتاعه","إن","ان","على","عن","من","في",
+  "مش","لسه","اللي","هو","هي","العميل","عميل","بيقول","يقول","ان","إلى","الى"]);
+function tokenize(s){ return normalize(s).split(" ").filter(x=>x.length>=2 && !STOPWORDS.has(x)); }
+function corpusOf(item){
+  const parts=[];
+  ['en','ar'].forEach(L=>{
+    const v=item[L]; if(!v) return;
+    parts.push(v.title||"", (v.keywords||[]).join(" "), (v.exampleQuestions||[]).join(" "), v.explanation||"");
+  });
+  parts.push(item.category||"", item.subcategory||"");
+  return normalize(parts.join(" "));
+}
+function scoreItem(item, tokens, raw){
+  const corpus=corpusOf(item);
+  const titles=normalize((item.en&&item.en.title||"")+" "+(item.ar&&item.ar.title||""));
+  let score=0;
+  tokens.forEach(tok=>{
+    if(titles.includes(tok)) score+=2;
+    else if(corpus.includes(tok)) score+=1;
+    else if(tok.length>=4 && (corpus.includes(tok.slice(0,-1))||corpus.includes(tok.slice(1)))) score+=0.5;
+  });
+  const rawN=normalize(raw);
+  if(rawN && titles.includes(rawN)) score+=3;
+  return score;
+}
+function runSearch(query){
+  const tokens=tokenize(query);
+  const pool=knowledgeItems.filter(it=>{
+    if(state.filterStatus!=="All" && it.status!==state.filterStatus) return false;
+    if(state.filterCategory!=="All" && it.category!==state.filterCategory) return false;
+    if(state.filterTeam!=="All" && it.responsibleTeam!==state.filterTeam) return false;
+    return true;
+  });
+  const scored=pool.map(it=>({item:it,score:scoreItem(it,tokens,query)}))
+                   .filter(s=>s.score>0).sort((a,b)=>b.score-a.score);
+  logSearch(query, scored.length?scored[0].item:null);
+  if(!scored.length) return {query,best:null,others:[]};
+  return {query,best:scored[0].item,others:scored.slice(1,4).map(s=>s.item)};
+}
+function logSearch(query,item,titleOverride){
+  const row = {
+    id:nextId("h"), query, date:todayStr(), time:nowTimeStr(),
+    category:item?item.category:(titleOverride?"Trading":"—"),
+    team:item?(item.responsibleTeam||"—"):(titleOverride?"Financial Department":"—"),
+    resultId:item?item.id:null,
+    resultTitle:item?(C(item,'title')):(titleOverride||null),
+    agent:state.session?state.session.name:"—"
+  };
+  searchHistory.unshift(row);
+  if(db && state.session){
+    db.from('search_history').insert({
+      user_id: state.session.userId, query,
+      category: row.category, team: row.team,
+      result_id: row.resultId, result_title: row.resultTitle,
+      agent_name: row.agent
+    }).then(({error})=>{ if(error) console.warn('history insert failed:', error.message); });
+  }
+}
+
+/* ============================== 7. RENDER ROOT ============================== */
+function render(){
+  const app=document.getElementById('app');
+  if(!state.session){ app.innerHTML=renderLogin(); return; }
+  // Guard: if the current view is not permitted for this role, fall back.
+  if(!can(state.view)) state.view=defaultViewFor(state.session.role);
+  const wide=['dashboard','knowledge','quality','users','searchhistory','missing','statistics'].includes(state.view);
+  app.innerHTML=`
+    ${renderSidebar()}
+    <div class="main"><div class="${wide?'container-wide':'container'}">${renderView()}</div></div>
+    ${state.modal?renderModal():''}`;
+  document.removeEventListener('keydown',escHandler);
+  document.addEventListener('keydown',escHandler);
+  schedulePersist();
+}
+function escHandler(e){ if(e.key==='Escape'&&state.modal) closeModal(); }
+window.addEventListener('resize',()=>{ if(window.innerWidth>980) closeSidebarMobile(); });
+
+function renderSidebar(){
+  const isAdmin=state.session.role==='admin';
+  const item=(v,icon,label,badge)=>!can(v)?'':`
+    <button class="nav-item ${state.view===v?'active':''}" onclick="goTo('${v}')">
+      <span class="nav-icon">${icon}</span><span>${label}</span>
+      ${badge?`<span class="nav-badge">${badge}</span>`:''}
+    </button>`;
+  const initials=(state.session.name||'?').trim().charAt(0).toUpperCase();
+  return `
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">KB</div>
+      <div>
+        <div class="brand-title">${t('appName')}</div>
+        <div class="brand-sub">${t('appSub')}</div>
+      </div>
+    </div>
+    <div class="lang-toggle">
+      <button class="lang-btn ${state.lang==='en'?'active':''}" onclick="setLang('en')">EN</button>
+      <button class="lang-btn ${state.lang==='ar'?'active':''}" onclick="setLang('ar')">AR</button>
+    </div>
+    <div class="user-chip">
+      <div class="user-avatar">${esc(initials)}</div>
+      <div class="user-meta">
+        <div class="user-name">${esc(state.session.name)}</div>
+        <div class="user-role">${roleLabel(state.session.role)}</div>
+      </div>
+      <button class="icon-btn" title="${t('logout')}" onclick="logout()">⏻</button>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">${t('workspace')}</div>
+      ${item('search','🔍',t('navSearch'))}
+      ${item('favorites','★',t('navFavorites'), myFavorites().length||'')}
+      ${item('history','🕘',t('navHistory'))}
+      ${!isAdmin?item('knowledge','📚',t('navKnowledge')):''}
+      ${!isAdmin?item('qualityerrors','⚠',t('navQualityErrors')):''}
+    </div>
+    ${isAdmin?`
+    <div class="nav-group">
+      <div class="nav-label">${t('administration')}</div>
+      ${item('dashboard','▦',t('navDashboard'))}
+      ${item('knowledge','📚',t('navKnowledge'))}
+      ${item('quality','✓',t('navQuality'))}
+      ${item('qualityerrors','⚠',t('navQualityErrors'))}
+      ${item('users','👥',t('navUsers'))}
+      ${item('categories','🗂',t('navCategories'))}
+      ${item('teams','🏷',t('navTeams'))}
+      ${item('searchhistory','📋',t('navSearchHistory'))}
+      ${item('missing','⚠',t('navMissing'), missingRequests.filter(m=>m.status==='Pending').length||'')}
+      ${item('statistics','📈',t('navStatistics'))}
+      ${item('settings','⚙',t('navSettings'))}
+    </div>`:''}
+    <div class="sidebar-spacer"></div>
+    <div class="sync-chip" title="${db?t('syncLiveHint'):t('syncLocalHint')}">
+      <span class="sync-dot ${db?'on':'off'}"></span>
+      <span class="sync-text">${db?t('syncLive'):t('syncLocal')}</span>
+      ${db?`<button class="icon-btn" onclick="syncNow()" title="${t('syncNow')}">⟳</button>`:''}
+    </div>
+  </div>`;
+}
+function goTo(v){
+  if(!can(v)){ showToast(t('accessDenied')); return; }
+  state.view=v; state.editingItemId=null; state.editingRuleId=null;
+  state.editingUserId=null; state.editingErrorId=null; state.errorFilter="";
+  state.viewingKbId=null;
+  closeSidebarMobile(); render();
+}
+function renderView(){
+  switch(state.view){
+    case 'search': return renderSearch();
+    case 'favorites': return renderFavorites();
+    case 'history': return renderHistory(false);
+    case 'qualityerrors': return state.session.role==='admin'
+        ? (state.editingErrorId!==null?renderErrorForm():renderErrorsAdmin())
+        : renderErrorsAgent();
+    case 'searchhistory': return renderHistory(true);
+    case 'dashboard': return renderDashboard();
+    case 'knowledge': return state.editingItemId!==null?renderKnowledgeForm():renderKnowledgeList();
+    case 'quality': return state.editingRuleId!==null?renderQualityForm():renderQualityList();
+    case 'users': return state.editingUserId!==null?renderUserForm():renderUsersList();
+    case 'categories': return renderSimpleList('categories');
+    case 'teams': return renderSimpleList('teams');
+    case 'missing': return renderMissing();
+    case 'statistics': return renderStatistics();
+    case 'settings': return renderSettings();
+    default: return renderSearch();
+  }
+}
+
+/* ============================== LOGIN ============================== */
+function renderLogin(){
+  return `<div class="login-wrap"><div class="card login-card">
+    <div class="login-logo">KB</div>
+    <h2>${t('loginTitle')}</h2>
+    <p>${t('loginSub')}</p>
+    <div class="login-lang">
+      <button class="${state.lang==='en'?'active':''}" onclick="setLang('en')">English</button>
+      <button class="${state.lang==='ar'?'active':''}" onclick="setLang('ar')">العربية</button>
+    </div>
+    ${state.loginError?`<div class="login-error">${esc(state.loginError)}</div>`:''}
+    <div class="field">
+      <label>${t('username')}</label>
+      <input id="li_user" type="text" dir="auto" placeholder="${t('usernamePlaceholder')}"
+        onkeydown="if(event.key==='Enter')document.getElementById('li_pass').focus()">
+    </div>
+    <div class="field">
+      <label>${t('password')}</label>
+      <div class="pass-row">
+        <input id="li_pass" type="password" placeholder="${t('passwordPlaceholder')}"
+          onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" onclick="togglePass('li_pass',this)">${t('show')}</button>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()">${t('signIn')}</button>
+  </div></div>`;
+}
+function togglePass(id,btn){
+  const el=document.getElementById(id);
+  if(el.type==='password'){ el.type='text'; btn.textContent=t('hide'); }
+  else { el.type='password'; btn.textContent=t('show'); }
+}
+/* Usernames (not emails) are what the login screen asks for, to match the
+   existing UI — Supabase Auth itself only speaks email, so each username
+   maps to a fixed pseudo-email under this constant domain (accounts are
+   still created with real passwords in the Supabase Dashboard; only the
+   address format is synthetic, nothing is actually emailed there). */
+const AUTH_EMAIL_DOMAIN = "maxify-knowledge.local";
+function usernameToEmail(u){ return u.trim().toLowerCase()+"@"+AUTH_EMAIL_DOMAIN; }
+
+/* Basic client-side lockout: after MAX_LOGIN_ATTEMPTS failures for a given
+   username, block further attempts for LOCKOUT_MS. This is on top of, not
+   instead of, Supabase's own server-side auth checks — a deterrent against
+   casual retyping, not a substitute for real rate limiting. */
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_MS = 30000;
+let loginAttempts = {}; // { usernameLower: {count, lockedUntil} }
+
+async function doLogin(){
+  const u=(document.getElementById('li_user').value||'').trim();
+  const p=document.getElementById('li_pass').value||'';
+  const key=u.toLowerCase();
+  const rec=loginAttempts[key];
+  if(rec && rec.lockedUntil && Date.now()<rec.lockedUntil){
+    const secsLeft=Math.ceil((rec.lockedUntil-Date.now())/1000);
+    state.loginError=t('loginLocked').replace('{s}',secsLeft);
+    render(); return;
+  }
+  if(!db){ state.loginError=t('loginFailed'); render(); return; }
+
+  const {data, error} = await db.auth.signInWithPassword({ email: usernameToEmail(u), password: p });
+  if(error || !data.session){
+    loginAttempts[key]=loginAttempts[key]||{count:0,lockedUntil:0};
+    loginAttempts[key].count++;
+    if(loginAttempts[key].count>=MAX_LOGIN_ATTEMPTS){
+      loginAttempts[key].lockedUntil=Date.now()+LOCKOUT_MS;
+      loginAttempts[key].count=0;
+      state.loginError=t('loginLocked').replace('{s}',Math.ceil(LOCKOUT_MS/1000));
+    } else {
+      state.loginError=t('loginFailed');
+    }
+    render(); return;
+  }
+
+  // Auth succeeded — now load this person's role/status from `profiles`.
+  // Real access control has already happened server-side (Supabase just
+  // verified the password); this is just fetching who they are.
+  const {data:profile, error:pErr} = await db.from('profiles').select('*').eq('id', data.user.id).single();
+  if(pErr || !profile || profile.status!=='Active'){
+    await db.auth.signOut();
+    state.loginError = (!profile||pErr) ? t('loginFailed') : t('accountInactive');
+    render(); return;
+  }
+
+  delete loginAttempts[key];
+  db.from('profiles').update({last_login: new Date().toISOString()}).eq('id', profile.id).then(()=>{});
+  state.session={userId:profile.id, name:profile.name, username:profile.username, role:profile.role};
+  state.loginError=""; state.view=defaultViewFor(profile.role);
+  await Promise.all([fetchMyFavorites(), fetchMyHistory(), fetchKbData(), profile.role==='admin'?fetchProfiles():Promise.resolve()]);
+  render();
+}
+function logout(){
+  if(db){ db.auth.signOut(); if(kbChannel) db.removeChannel(kbChannel); kbChannel=null; }
+  state.session=null; state.view='login'; state.lastResults=null;
+  searchHistory=[]; favoritesByUser={}; users=[];
+  render();
+}
+
+/* ============================== SEARCH VIEW ============================== */
+function renderSearch(){
+  const catOpts=`<option value="All">${t('all')}</option>`+categories.map(c=>
+    `<option value="${esc(c)}" ${state.filterCategory===c?'selected':''}>${esc(c)}</option>`).join('');
+  const teamOpts=`<option value="All">${t('all')}</option>`+teams.map(x=>
+    `<option value="${esc(x)}" ${state.filterTeam===x?'selected':''}>${esc(x)}</option>`).join('');
+  const statusOpts=[['Active',t('active')],['Inactive',t('inactive')],['All',t('all')]].map(([v,l])=>
+    `<option value="${v}" ${state.filterStatus===v?'selected':''}>${l}</option>`).join('');
+  const quick = state.lang==='ar'
+    ? ["إيداع USDT","السحب قيد المراجعة","توثيق الحساب","MaxPay","Max Fi"]
+    : ["USDT deposit","Withdrawal under review","Verification","MaxPay","Max Fi"];
+  return `
+    <div class="hero">
+      <h1>${t('heroTitle')}</h1>
+      <p>${t('heroSub')}</p>
+      <div class="search-shell">
+        <span class="search-icon">🔍</span>
+        <input id="searchInput" type="text" dir="auto" placeholder="${t('searchPlaceholder')}"
+          value="${esc(state.searchQuery)}" onkeydown="if(event.key==='Enter')doSearch()" autofocus>
+        <button class="btn btn-primary" onclick="doSearch()">${t('search')}</button>
+      </div>
+      <div class="search-filters">
+        <select class="filter-select" onchange="state.filterCategory=this.value">${catOpts}</select>
+        <select class="filter-select" onchange="state.filterTeam=this.value">${teamOpts}</select>
+        <select class="filter-select" onchange="state.filterStatus=this.value">${statusOpts}</select>
+      </div>
+      <div class="quick-tags">
+        ${quick.map(q=>`<span class="quick-tag" onclick="quickSearch(${esc(JSON.stringify(q))})">${esc(q)}</span>`).join('')}
+      </div>
+    </div>
+    <div>${renderResults()}</div>`;
+}
+function quickSearch(q){ state.searchQuery=q; doSearch(); }
+function doSearch(){
+  const el=document.getElementById('searchInput');
+  const q=el?el.value:state.searchQuery;
+  state.searchQuery=q;
+  if(!q||!q.trim()){ state.lastResults=null; render(); return; }
+  state.lastResults=runSearch(q.trim());
+  render();
+}
+function renderResults(){
+  if(state.lastResults===null) return '';
+  const r=state.lastResults;
+  if(!r.best){
+    return `<div class="results-wrap"><div class="card no-match">
+      <div class="icon">🗂</div><h3>${t('noMatchTitle')}</h3><p>${t('noMatchSub')}</p>
+      <button class="btn btn-outline" onclick="reportMissing(${esc(JSON.stringify(r.query))})">${t('reportMissing')}</button>
+    </div></div>`;
+  }
+  return `<div class="results-wrap">
+    <span class="best-match-tag">✓ ${t('bestMatch')}</span>
+    ${renderResultCard(r.best)}
+    ${r.others.length?`<div class="other-matches"><h5>${t('otherMatches')}</h5>
+      ${r.others.map(it=>`<div class="other-match-row" onclick="openOther('${it.id}')">
+        <div><div class="t" dir="auto">${esc(C(it,'title'))}</div>
+             <div class="c">${esc(it.category)} · ${esc(typeLabel(it.type))}</div></div>
+        <span class="badge">${t('view')}</span></div>`).join('')}
+    </div>`:''}
+  </div>`;
+}
+function openOther(id){
+  const r=state.lastResults; const item=findItem(id);
+  const rest=[r.best].concat(r.others).filter(x=>x&&x.id!==id);
+  state.lastResults={query:r.query,best:item,others:rest};
+  render(); window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderResultCard(item, opts){
+  opts=opts||{};
+  const favs=myFavorites(); const isFav=favs.includes(item.id);
+  const steps=(C(item,'supportSteps')||[]);
+  const req=(C(item,'requiredInformation')||[]);
+  const rules=rulesFor(item.id);
+  const clientResp=C(item,'clientResponse');
+  const internal=C(item,'internalAnswer');
+  const notes=C(item,'importantNotes');
+  const esc_=C(item,'escalationConditions');
+  return `<div class="card result-card">
+    <div class="result-head">
+      <div>
+        <h3 class="result-title" dir="auto">${esc(C(item,'title'))}</h3>
+        <div class="result-meta">
+          <span class="badge">${esc(item.category)}</span>
+          ${item.type?`<span class="badge badge-type">${esc(typeLabel(item.type))}</span>`:''}
+          ${item.responsibleTeam?`<span class="badge badge-team">${esc(item.responsibleTeam)}</span>`:''}
+          ${item.needsClarification?`<span class="clarify-flag">${t('needsClarificationFlag')}</span>`:''}
+        </div>
+      </div>
+      ${opts.noFav?'':`<button class="fav-btn ${isFav?'active':''}" onclick="toggleFav('${item.id}')">${isFav?'★':'☆'}</button>`}
+    </div>
+    <div class="result-body">
+      ${C(item,'explanation')?`<div class="section-block"><h4>${t('explanation')}</h4>
+        <p dir="auto">${nl2br(C(item,'explanation'))}</p></div>`:''}
+      ${clientResp?`<div class="section-block"><h4>${t('clientResponseHeader')}</h4>
+        <div class="response-box">
+          <button class="copy-btn" onclick="copyText(${esc(JSON.stringify(clientResp))},this)">${t('copyResponse')}</button>
+          <p dir="auto">${nl2br(clientResp)}</p></div></div>`:''}
+      ${steps.length?`<div class="section-block"><h4>${t('supportSteps')}</h4>
+        <ul class="steps-list">${steps.map((s,i)=>
+          `<li><span class="step-num">${i+1}</span><span dir="auto">${esc(s)}</span></li>`).join('')}</ul></div>`:''}
+      <div class="section-block"><h4>${t('escalation')}</h4>
+        <div class="escalation-box ${item.raiseRequest?'escalation-yes':'escalation-no'}">
+          <div class="escalation-row"><b>${t('raiseRequest')}</b> <span>${item.raiseRequest?t('yes'):t('no')}</span></div>
+          ${item.raiseRequest?`
+            <div class="escalation-row"><b>${t('responsibleTeam')}</b> <span>${esc(item.responsibleTeam||'—')}</span></div>
+            ${esc_?`<div class="escalation-row"><b>${t('whenToRaise')}</b> <span dir="auto">${esc(esc_)}</span></div>`:''}
+          `:''}
+        </div></div>
+      ${req.length?`<div class="section-block"><h4>${t('requiredInformation')}</h4>
+        <div class="response-box">
+          <button class="copy-btn" onclick="copyText(${esc(JSON.stringify(req.join('\\n')))},this)">${t('copy')}</button>
+          <ul class="req-info-list">${req.map(x=>`<li dir="auto">${esc(x)}</li>`).join('')}</ul>
+        </div></div>`:''}
+      ${rules.length?`<div class="section-block"><h4>${t('qualityRequirements')}</h4>
+        ${rules.map(r=>`<div class="quality-item">
+          <div class="quality-item-head">
+            <div class="quality-item-title" dir="auto">${esc(C(r,'title'))}</div>
+            <span class="prio prio-${r.priority.toLowerCase()}">${priorityLabel(r.priority)}</span>
+          </div>
+          ${C(r,'expectedAction')?`<div class="quality-line"><b>${t('qualityExpectedAction')}</b><span dir="auto">${esc(C(r,'expectedAction'))}</span></div>`:''}
+          ${C(r,'rule')?`<div class="quality-line"><b>${t('qualityRule')}</b><span dir="auto">${esc(C(r,'rule'))}</span></div>`:''}
+        </div>`).join('')}
+      </div>`:''}
+      ${internal?`<div class="section-block">
+        <details class="accordion"><summary>${t('internalAnswer')}</summary>
+          <div class="accordion-body"><div class="response-box">
+            <button class="copy-btn" onclick="copyText(${esc(JSON.stringify(internal))},this)">${t('copy')}</button>
+            <p dir="auto">${nl2br(internal)}</p></div></div>
+        </details></div>`:''}
+      ${notes?`<div class="section-block"><h4>${t('importantNotes')}</h4>
+        <div class="notes-box" dir="auto">${esc(notes)}</div></div>`:''}
+    </div></div>`;
+}
+function toggleFav(id){
+  const favs=myFavorites(); const i=favs.indexOf(id);
+  if(i===-1){
+    favs.push(id); showToast(t('addedFav'));
+    if(db && state.session) db.from('favorites').insert({user_id:state.session.userId, item_id:id})
+      .then(({error})=>{ if(error) console.warn('favorite insert failed:', error.message); });
+  } else {
+    favs.splice(i,1); showToast(t('removedFav'));
+    if(db && state.session) db.from('favorites').delete()
+      .eq('user_id', state.session.userId).eq('item_id', id)
+      .then(({error})=>{ if(error) console.warn('favorite delete failed:', error.message); });
+  }
+  render();
+}
+function reportMissing(q){
+  const ex=missingRequests.find(m=>normalize(m.question)===normalize(q));
+  if(ex) ex.count++;
+  else missingRequests.push({id:nextId("m"),question:q,count:1,date:todayStr(),status:"Pending"});
+  showToast(t('reported')); render();
+}
+
+/* ============================== FAVORITES ============================== */
+function renderFavorites(){
+  const items=myFavorites().map(findItem).filter(Boolean);
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('favTitle')}</h1><p class="page-sub">${t('favSub')}</p></div></div>
+    ${items.length?items.map(i=>renderResultCard(i)).join(''):
+      `<div class="card empty-state"><div class="icon">★</div>${t('noFavorites')}</div>`}`;
+}
+
+/* ============================== HISTORY ============================== */
+function renderHistory(isAdminView){
+  const q=normalize(state.historyFilter);
+  let rows=searchHistory;
+  if(!isAdminView) rows=rows.filter(h=>h.agent===state.session.name);
+  rows=rows.filter(h=>!q||normalize(h.query).includes(q)||normalize(h.resultTitle||"").includes(q));
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${isAdminView?t('navSearchHistory'):t('historyTitle')}</h1>
+      <p class="page-sub">${t('historySub')}</p></div></div>
+    <div class="toolbar"><div class="search-mini"><span>🔍</span>
+      <input dir="auto" placeholder="${t('filterHistory')}" value="${esc(state.historyFilter)}"
+        oninput="state.historyFilter=this.value;refreshHistory(${isAdminView});"></div></div>
+    <div class="card" id="histWrap">${historyTable(rows,isAdminView)}</div>`;
+}
+function refreshHistory(isAdminView){
+  const q=normalize(state.historyFilter);
+  let rows=searchHistory;
+  if(!isAdminView) rows=rows.filter(h=>h.agent===state.session.name);
+  rows=rows.filter(h=>!q||normalize(h.query).includes(q)||normalize(h.resultTitle||"").includes(q));
+  document.getElementById('histWrap').innerHTML=historyTable(rows,isAdminView);
+}
+function historyTable(rows,isAdminView){
+  if(!rows.length) return `<div class="empty-state"><div class="icon">🕘</div>${t('noSearches')}</div>`;
+  return `<table><thead><tr>
+      <th>${t('colSearch')}</th><th>${t('colResult')}</th><th>${t('colCategory')}</th>
+      ${isAdminView?`<th>${t('colEmployee')}</th>`:''}
+      <th>${t('colDate')}</th><th>${t('colTime')}</th></tr></thead><tbody>
+    ${rows.map(h=>`<tr class="${h.resultId?'tr-hover':''}" ${h.resultId?`onclick="viewItemModal('${h.resultId}')"`:''}>
+      <td dir="auto">${esc(h.query)}</td>
+      <td dir="auto">${h.resultId?esc(h.resultTitle):`<span style="color:var(--text-muted)">${t('noMatchInline')}</span>`}</td>
+      <td>${esc(h.category)}</td>
+      ${isAdminView?`<td dir="auto">${esc(h.agent)}</td>`:''}
+      <td>${esc(h.date)}</td><td>${esc(h.time)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+function viewItemModal(id){ state.modal={type:'view',id}; render(); }
+
+/* ============================== DASHBOARD / STATS ============================== */
+function countBy(arr,fn){
+  const m={}; arr.forEach(x=>{const k=fn(x); if(!k)return; m[k]=(m[k]||0)+1;});
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+}
+function bars(data){
+  if(!data.length) return `<p style="font-size:12.5px;color:var(--text-muted);margin:0;">${t('noData')}</p>`;
+  const max=data[0][1];
+  return data.map(([l,c])=>`<div class="bar-row">
+    <div class="bar-label" dir="auto" title="${esc(l)}">${esc(l)}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${Math.max(6,(c/max)*100)}%"></div></div>
+    <div class="bar-count">${c}</div></div>`).join('');
+}
+function renderDashboard(){
+  if(!can('dashboard')) return '';
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('adminDashboard')}</h1><p class="page-sub">${t('adminDashboardSub')}</p></div></div>
+    <div class="stat-grid">
+      <div class="card stat-card"><div class="n">${knowledgeItems.length}</div><div class="l">${t('totalKnowledge')}</div></div>
+      <div class="card stat-card"><div class="n">${qualityRules.length}</div><div class="l">${t('totalQuality')}</div></div>
+      <div class="card stat-card"><div class="n">${searchHistory.length}</div><div class="l">${t('totalSearches')}</div></div>
+      <div class="card stat-card"><div class="n">${missingRequests.filter(m=>m.status==='Pending').length}</div><div class="l">${t('missingPending')}</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card card-pad"><h4 class="panel-title">${t('mostSearched')}</h4>
+        ${bars(countBy(searchHistory,h=>h.resultId?h.resultTitle:null).slice(0,5))}</div>
+      <div class="card card-pad"><h4 class="panel-title">${t('mostUsedCategories')}</h4>
+        ${bars(countBy(searchHistory.filter(h=>h.category!=='—'),h=>h.category).slice(0,5))}</div>
+    </div>
+    <div class="two-col" style="margin-top:15px;">
+      <div class="card card-pad"><h4 class="panel-title">${t('mostActiveAgents')}</h4>
+        ${bars(countBy(searchHistory.filter(h=>h.agent!=='—'),h=>h.agent).slice(0,5))}</div>
+      <div class="card card-pad"><h4 class="panel-title">${t('knowledgeGaps')}</h4>
+        ${missingRequests.length?missingRequests.slice(0,5).map(m=>`<div class="bar-row">
+            <div class="bar-label" dir="auto" style="width:auto;flex:1;" title="${esc(m.question)}">${esc(m.question)}</div>
+            <span class="status-pill status-${m.status.toLowerCase()}">${statusLabel(m.status)}</span></div>`).join('')
+          :`<p style="font-size:12.5px;color:var(--text-muted);margin:0;">${t('nothingReported')}</p>`}</div>
+    </div>`;
+}
+function renderStatistics(){
+  if(!can('statistics')) return '';
+  const byCat=countBy(qualityRules,r=>r.category);
+  const byKnow=countBy(qualityRules,r=>{const k=findItem(r.knowledgeId); return k?C(k,'title'):null;});
+  const activeUsers=users.filter(u=>u.status==='Active').length;
+  const critical=qualityRules.filter(r=>r.priority==='Critical').length;
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('statsTitle')}</h1><p class="page-sub">${t('statsSub')}</p></div></div>
+    <div class="stat-grid">
+      <div class="card stat-card"><div class="n">${knowledgeItems.length}</div><div class="l">${t('totalKnowledge')}</div></div>
+      <div class="card stat-card"><div class="n">${critical}</div><div class="l">${t('criticalRules')}</div></div>
+      <div class="card stat-card"><div class="n">${searchHistory.length}</div><div class="l">${t('totalSearches')}</div></div>
+      <div class="card stat-card"><div class="n">${activeUsers}</div><div class="l">${t('activeUsers')}</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card card-pad"><h4 class="panel-title">${t('rulesByCategory')}</h4>${bars(byCat)}</div>
+      <div class="card card-pad"><h4 class="panel-title">${t('rulesByKnowledge')}</h4>${bars(byKnow)}</div>
+    </div>
+    <div class="two-col" style="margin-top:15px;">
+      <div class="card card-pad"><h4 class="panel-title">${t('mostSearched')}</h4>
+        ${bars(countBy(searchHistory,h=>h.resultId?h.resultTitle:null).slice(0,6))}</div>
+      <div class="card card-pad"><h4 class="panel-title">${t('mostActiveAgents')}</h4>
+        ${bars(countBy(searchHistory.filter(h=>h.agent!=='—'),h=>h.agent).slice(0,6))}</div>
+    </div>`;
+}
+
+/* ============================== KNOWLEDGE BASE ============================== */
+function renderKnowledgeList(){
+  if(!can('knowledge')) return '';
+  const isAdmin = state.session.role==='admin';
+  if(!isAdmin && state.viewingKbId){
+    const item = findItem(state.viewingKbId);
+    if(!item) { state.viewingKbId=null; }
+    else return `<div class="page-head"><div>
+        <button class="btn btn-ghost btn-sm" onclick="state.viewingKbId=null;render();">← ${t('back')}</button>
+      </div></div>${renderResultCard(item)}`;
+  }
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('knowledgeTitle')}</h1><p class="page-sub">${t('knowledgeSub')}</p></div></div>
+    <div class="info-banner">${t('knowledgeIntro')}</div>
+    <div class="toolbar">
+      <div class="search-mini"><span>🔍</span><input id="kbFilter" dir="auto" placeholder="${t('filterItems')}" oninput="refreshKb()"></div>
+      ${isAdmin?`<button class="btn btn-primary" onclick="openAddKnowledge()">+ ${t('addKnowledge')}</button>`:''}
+    </div>
+    <div class="card" id="kbWrap">${kbRows(knowledgeItems, isAdmin)}</div>`;
+}
+function refreshKb(){
+  const q=normalize(document.getElementById('kbFilter').value);
+  const rows=knowledgeItems.filter(it=>!q||normalize(C(it,'title')).includes(q)||
+    normalize((it.en&&it.en.title)||"").includes(q)||normalize((it.ar&&it.ar.title)||"").includes(q)||
+    normalize(it.category).includes(q));
+  document.getElementById('kbWrap').innerHTML=kbRows(rows, state.session.role==='admin');
+}
+function kbRows(rows, isAdmin){
+  if(isAdmin===undefined) isAdmin = state.session.role==='admin';
+  if(!rows.length) return `<div class="empty-state"><div class="icon">📚</div>${t('noItems')}</div>`;
+  return `<table><thead><tr>
+      <th>${t('colTitle')}</th><th>${t('colCategory')}</th><th>${t('colType')}</th>
+      <th>${t('navQuality')}</th><th>${t('colStatus')}</th><th>${t('colUpdated')}</th>
+      ${isAdmin?`<th>${t('colActions')}</th>`:''}
+    </tr></thead><tbody>
+    ${rows.map(it=>{
+      const n=qualityRules.filter(q=>q.knowledgeId===it.id).length;
+      return `<tr ${isAdmin?'':`class="kb-row-clickable" onclick="state.viewingKbId='${it.id}';render();"`}>
+        <td dir="auto"><div style="font-weight:600;color:var(--text);">${esc(C(it,'title'))}</div>
+          ${it.needsClarification?`<span class="clarify-flag" style="margin-top:4px;display:inline-block;">${t('needsClarificationFlag')}</span>`:''}</td>
+        <td>${esc(it.category)}</td>
+        <td>${esc(typeLabel(it.type))}</td>
+        <td>${n?`<span class="badge">${n}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
+        <td><span class="badge ${it.status==='Active'?'badge-active':'badge-inactive'}">${statusLabel(it.status)}</span></td>
+        <td>${esc(it.updatedAt)}</td>
+        ${isAdmin?`<td class="row-actions">
+          <button class="btn btn-outline btn-sm" onclick="openEditKnowledge('${it.id}')">${t('edit')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleKbStatus('${it.id}')">${it.status==='Active'?t('deactivate'):t('activate')}</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeleteKb('${it.id}')">${t('del')}</button>
+        </td>`:''}</tr>`;}).join('')}
+  </tbody></table>`;
+}
+function toggleKbStatus(id){
+  if(!guard('knowledge.write')) return;
+  const it=findItem(id); if(!it) return;
+  it.status=it.status==='Active'?'Inactive':'Active'; it.updatedAt=todayStr();
+  render(); showToast(t('markedAs')+' '+statusLabel(it.status));
+}
+function confirmDeleteKb(id){ if(!guard('knowledge.write'))return; state.modal={type:'del-kb',id}; render(); }
+function doDeleteKb(id){
+  if(!guard('knowledge.write')) return;
+  knowledgeItems=knowledgeItems.filter(i=>i.id!==id);
+  qualityRules=qualityRules.filter(q=>q.knowledgeId!==id);
+  // Only this session's own cache/row can be touched (RLS scopes favorites
+  // to their owner); other users' now-orphaned favorite rows are harmless —
+  // anywhere favorites are rendered, missing items are filtered out.
+  if(state.session){
+    favoritesByUser[state.session.userId] = (favoritesByUser[state.session.userId]||[]).filter(f=>f!==id);
+    if(db) db.from('favorites').delete().eq('user_id', state.session.userId).eq('item_id', id);
+  }
+  state.modal=null; render(); showToast(t('itemDeleted'));
+}
+function openAddKnowledge(){ if(!guard('knowledge.write'))return; state.editingItemId='new'; render(); }
+function openEditKnowledge(id){ if(!guard('knowledge.write'))return; state.editingItemId=id; render(); }
+function cancelKb(){ state.editingItemId=null; render(); }
+
+function langFields(L, data){
+  const P=L.toUpperCase();
+  return `
+    <div class="field form-full"><label>${t('fTitle')}</label>
+      <input id="f_${L}_title" dir="auto" value="${esc(data.title||'')}"></div>
+    <div class="field form-full"><label>${t('fKeywords')} <span class="field-hint">${t('hintComma')}</span></label>
+      <input id="f_${L}_keywords" dir="auto" value="${esc((data.keywords||[]).join(', '))}"></div>
+    <div class="field form-full"><label>${t('fExampleQuestions')} <span class="field-hint">${t('hintPerLine')}</span></label>
+      <textarea id="f_${L}_questions" dir="auto" rows="3">${esc((data.exampleQuestions||[]).join('\n'))}</textarea></div>
+    <div class="field form-full"><label>${t('fExplanation')}</label>
+      <textarea id="f_${L}_explanation" dir="auto" rows="3">${esc(data.explanation||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fClientResponse')} <span class="field-hint">${t('hintClient')}</span></label>
+      <textarea id="f_${L}_clientResponse" dir="auto" rows="3">${esc(data.clientResponse||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fInternalAnswer')} <span class="field-hint">${t('hintInternal')}</span></label>
+      <textarea id="f_${L}_internalAnswer" dir="auto" rows="3">${esc(data.internalAnswer||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fSupportSteps')} <span class="field-hint">${t('hintOrdered')}</span></label>
+      <textarea id="f_${L}_steps" dir="auto" rows="4">${esc((data.supportSteps||[]).join('\n'))}</textarea></div>
+    <div class="field form-full"><label>${t('fEscalationConditions')} <span class="field-hint">${t('hintWhen')}</span></label>
+      <textarea id="f_${L}_escalation" dir="auto" rows="2">${esc(data.escalationConditions||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fRequiredInformation')} <span class="field-hint">${t('hintItemPerLine')}</span></label>
+      <textarea id="f_${L}_required" dir="auto" rows="3">${esc((data.requiredInformation||[]).join('\n'))}</textarea></div>
+    <div class="field form-full"><label>${t('fImportantNotes')}</label>
+      <textarea id="f_${L}_notes" dir="auto" rows="2">${esc(data.importantNotes||'')}</textarea></div>`;
+}
+function renderKnowledgeForm(){
+  const isNew=state.editingItemId==='new';
+  const blank={title:"",keywords:[],exampleQuestions:[],explanation:"",internalAnswer:"",
+               clientResponse:"",supportSteps:[],escalationConditions:"",requiredInformation:[],importantNotes:""};
+  const it=isNew?{category:categories[0]||"",subcategory:"",type:"procedure",responsibleTeam:"",
+                  raiseRequest:false,status:"Active",needsClarification:false,
+                  en:Object.assign({},blank),ar:Object.assign({},blank)}
+                : findItem(state.editingItemId);
+  if(!it) return `<div class="card empty-state">${t('noItems')}</div>`;
+  const catOpts=categories.map(c=>`<option ${it.category===c?'selected':''}>${esc(c)}</option>`).join('');
+  const typeOpts=knowledgeTypes.map(ty=>`<option value="${esc(ty.id)}" ${it.type===ty.id?'selected':''}>${esc(ty[state.lang]||ty.en)}</option>`).join('');
+  const teamOpts=`<option value="">${t('none')}</option>`+teams.map(x=>
+    `<option ${it.responsibleTeam===x?'selected':''}>${esc(x)}</option>`).join('');
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${isNew?t('addKnowledgeTitle'):t('editKnowledgeTitle')}</h1></div></div>
+    <div class="card card-pad">
+      <h4 class="form-section-title">${t('generalInfo')}</h4>
+      <p class="form-section-desc">${t('generalInfoDesc')}</p>
+      <div class="form-grid">
+        <div class="field"><label>${t('fCategory')}</label><select id="f_category">${catOpts}</select></div>
+        <div class="field"><label>${t('fType')}</label><select id="f_type">${typeOpts}</select></div>
+        <div class="field"><label>${t('fSubcategory')}</label><input id="f_subcategory" dir="auto" value="${esc(it.subcategory||'')}"></div>
+        <div class="field"><label>${t('fStatus')}</label><select id="f_status">
+          <option value="Active" ${it.status==='Active'?'selected':''}>${t('active')}</option>
+          <option value="Inactive" ${it.status==='Inactive'?'selected':''}>${t('inactive')}</option></select></div>
+        <div class="field form-full"><div class="switch-row">
+          <div><div style="font-weight:600;">${t('raiseRequestLabel')}</div>
+            <div class="field-hint">${t('raiseRequestHint')}</div></div>
+          <label class="switch"><input type="checkbox" id="f_raise" ${it.raiseRequest?'checked':''} onchange="toggleTeamField()"><span class="slider"></span></label>
+        </div></div>
+        <div class="field form-full" id="teamField" style="display:${it.raiseRequest?'block':'none'}">
+          <label>${t('responsibleTeam')}</label><select id="f_team">${teamOpts}</select></div>
+        <div class="field form-full"><div class="switch-row">
+          <div><div style="font-weight:600;">${t('needsClarification')}</div>
+            <div class="field-hint">${t('needsClarificationHint')}</div></div>
+          <label class="switch"><input type="checkbox" id="f_clarify" ${it.needsClarification?'checked':''}><span class="slider"></span></label>
+        </div></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="lang-section">
+        <div class="lang-section-head"><span class="lang-flag">EN</span>
+          <div><div style="font-weight:700;font-size:13px;">${t('englishVersion')}</div>
+          <span>${t('englishVersionDesc')}</span></div></div>
+        <div class="form-grid">${langFields('en', it.en||blank)}</div>
+      </div>
+
+      <div class="lang-section" style="margin-top:16px;">
+        <div class="lang-section-head"><span class="lang-flag">AR</span>
+          <div><div style="font-weight:700;font-size:13px;">${t('arabicVersion')}</div>
+          <span>${t('arabicVersionDesc')}</span></div></div>
+        <div class="form-grid">${langFields('ar', it.ar||blank)}</div>
+      </div>
+
+      ${isNew?`<div class="divider"></div>
+      <div class="field form-full"><div class="switch-row">
+        <div><div style="font-weight:600;">${t('addToQuality')}</div>
+          <div class="field-hint">${t('addToQualityHint')}</div></div>
+        <label class="switch"><input type="checkbox" id="f_toQuality"><span class="slider"></span></label>
+      </div></div>`:''}
+
+      <div class="modal-actions" style="margin-top:20px;">
+        <button class="btn btn-ghost" onclick="cancelKb()">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="saveKb('${isNew?'new':it.id}')">${t('saveItem')}</button>
+      </div>
+    </div>`;
+}
+function toggleTeamField(){
+  document.getElementById('teamField').style.display=document.getElementById('f_raise').checked?'block':'none';
+}
+const lines=v=>v.split('\n').map(s=>s.trim()).filter(Boolean);
+const csv=v=>v.split(',').map(s=>s.trim()).filter(Boolean);
+function readLang(L){
+  const g=id=>document.getElementById('f_'+L+'_'+id).value;
+  return {
+    title:g('title').trim(), keywords:csv(g('keywords')),
+    exampleQuestions:lines(g('questions')), explanation:g('explanation').trim(),
+    internalAnswer:g('internalAnswer').trim(), clientResponse:g('clientResponse').trim(),
+    supportSteps:lines(g('steps')), escalationConditions:g('escalation').trim(),
+    requiredInformation:lines(g('required')), importantNotes:g('notes').trim()
+  };
+}
+function saveKb(idOrNew){
+  if(!guard('knowledge.write')) return;
+  const en=readLang('en'), ar=readLang('ar');
+  if(!en.title && !ar.title){ showToast(t('titleRequired')); return; }
+  const raise=document.getElementById('f_raise').checked;
+  const payload={
+    category:document.getElementById('f_category').value,
+    type:document.getElementById('f_type').value,
+    subcategory:document.getElementById('f_subcategory').value.trim(),
+    status:document.getElementById('f_status').value,
+    raiseRequest:raise,
+    responsibleTeam:raise?document.getElementById('f_team').value:"",
+    needsClarification:document.getElementById('f_clarify').checked,
+    en, ar, updatedAt:todayStr()
+  };
+  if(idOrNew==='new'){
+    const id=nextId('kb');
+    knowledgeItems.push(Object.assign({id,createdAt:todayStr()},payload));
+    const toQ=document.getElementById('f_toQuality');
+    if(toQ&&toQ.checked){
+      state.editingItemId=null; state.view='quality'; state.editingRuleId='new';
+      state.prefillKnowledgeId=id; render(); showToast(t('itemAdded')); return;
+    }
+    showToast(t('itemAdded'));
+  } else {
+    Object.assign(findItem(idOrNew),payload); showToast(t('itemUpdated'));
+  }
+  state.editingItemId=null; render();
+}
+
+/* ============================== QUALITY ============================== */
+function renderQualityList(){
+  if(!can('quality')) return '';
+  const byCat=countBy(qualityRules,r=>r.category);
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('qualityTitle')}</h1><p class="page-sub">${t('qualitySub')}</p></div>
+      <button class="btn btn-primary" onclick="openAddRule()">+ ${t('addQualityRule')}</button></div>
+    <div class="info-banner">${t('qualityIntro')}</div>
+    <div class="stat-grid">
+      <div class="card stat-card"><div class="n">${qualityRules.length}</div><div class="l">${t('totalQuality')}</div></div>
+      <div class="card stat-card"><div class="n">${qualityRules.filter(r=>r.priority==='Critical').length}</div><div class="l">${t('criticalRules')}</div></div>
+      <div class="card stat-card"><div class="n">${qualityRules.filter(r=>r.priority==='High').length}</div><div class="l">${t('priorityHigh')}</div></div>
+      <div class="card stat-card"><div class="n">${qualityRules.filter(r=>r.status==='Active').length}</div><div class="l">${t('active')}</div></div>
+    </div>
+    <div class="card" style="margin-bottom:15px;">${qualityRows(qualityRules)}</div>
+    <div class="card card-pad"><h4 class="panel-title">${t('rulesByCategory')}</h4>${bars(byCat)}</div>`;
+}
+function qualityRows(rows){
+  if(!rows.length) return `<div class="empty-state"><div class="icon">✓</div>${t('noQualityRules')}</div>`;
+  return `<table><thead><tr>
+      <th>${t('colTitle')}</th><th>${t('colKnowledge')}</th><th>${t('colCategory')}</th>
+      <th>${t('colPriority')}</th><th>${t('colStatus')}</th><th>${t('colActions')}</th></tr></thead><tbody>
+    ${rows.map(r=>{
+      const k=findItem(r.knowledgeId);
+      return `<tr>
+        <td dir="auto"><div style="font-weight:600;color:var(--text);">${esc(C(r,'title'))}</div></td>
+        <td dir="auto">${k?esc(C(k,'title')):`<span style="color:var(--text-muted)">—</span>`}</td>
+        <td>${esc(r.category)}</td>
+        <td><span class="prio prio-${r.priority.toLowerCase()}">${priorityLabel(r.priority)}</span></td>
+        <td><span class="badge ${r.status==='Active'?'badge-active':'badge-inactive'}">${statusLabel(r.status)}</span></td>
+        <td class="row-actions">
+          <button class="btn btn-outline btn-sm" onclick="openEditRule('${r.id}')">${t('edit')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleRuleStatus('${r.id}')">${r.status==='Active'?t('deactivate'):t('activate')}</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeleteRule('${r.id}')">${t('del')}</button>
+        </td></tr>`;}).join('')}
+  </tbody></table>`;
+}
+function toggleRuleStatus(id){
+  if(!guard('quality.write'))return;
+  const r=findRule(id); if(!r)return;
+  r.status=r.status==='Active'?'Inactive':'Active'; render(); showToast(t('markedAs')+' '+statusLabel(r.status));
+}
+function confirmDeleteRule(id){ if(!guard('quality.write'))return; state.modal={type:'del-rule',id}; render(); }
+function doDeleteRule(id){
+  if(!guard('quality.write'))return;
+  qualityRules=qualityRules.filter(r=>r.id!==id); state.modal=null; render(); showToast(t('ruleDeleted'));
+}
+function openAddRule(){ if(!guard('quality.write'))return; state.editingRuleId='new'; render(); }
+function openEditRule(id){ if(!guard('quality.write'))return; state.editingRuleId=id; render(); }
+function cancelRule(){ state.editingRuleId=null; state.prefillKnowledgeId=null; render(); }
+
+function renderQualityForm(){
+  const isNew=state.editingRuleId==='new';
+  const blank={title:"",requirement:"",expectedAction:"",rule:"",notes:""};
+  const r=isNew?{knowledgeId:state.prefillKnowledgeId||(knowledgeItems[0]&&knowledgeItems[0].id)||"",
+                 category:"",priority:"High",status:"Active",en:Object.assign({},blank),ar:Object.assign({},blank)}
+               :findRule(state.editingRuleId);
+  if(!r) return `<div class="card empty-state">${t('noQualityRules')}</div>`;
+  const kOpts=knowledgeItems.map(k=>`<option value="${esc(k.id)}" ${r.knowledgeId===k.id?'selected':''}>${esc(C(k,'title'))}</option>`).join('');
+  const pOpts=[['Critical',t('priorityCritical')],['High',t('priorityHigh')],
+               ['Medium',t('priorityMedium')],['Low',t('priorityLow')]]
+    .map(([v,l])=>`<option value="${v}" ${r.priority===v?'selected':''}>${l}</option>`).join('');
+  const langBlock=(L,d)=>`
+    <div class="field form-full"><label>${t('fTitle')}</label>
+      <input id="q_${L}_title" dir="auto" value="${esc(d.title||'')}"></div>
+    <div class="field form-full"><label>${t('fRequirement')} <span class="field-hint">${t('hintRequirement')}</span></label>
+      <textarea id="q_${L}_requirement" dir="auto" rows="2">${esc(d.requirement||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fExpectedAction')} <span class="field-hint">${t('hintExpectedAction')}</span></label>
+      <textarea id="q_${L}_action" dir="auto" rows="2">${esc(d.expectedAction||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fQualityRule')} <span class="field-hint">${t('hintQualityRule')}</span></label>
+      <textarea id="q_${L}_rule" dir="auto" rows="2">${esc(d.rule||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fNotes')}</label>
+      <textarea id="q_${L}_notes" dir="auto" rows="2">${esc(d.notes||'')}</textarea></div>`;
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${isNew?t('addQualityTitle'):t('editQualityTitle')}</h1></div></div>
+    <div class="card card-pad">
+      <h4 class="form-section-title">${t('generalInfo')}</h4>
+      <p class="form-section-desc">${t('qualityIntro')}</p>
+      <div class="form-grid">
+        <div class="field form-full"><label>${t('fRelatedKnowledge')}</label><select id="q_knowledge">${kOpts}</select></div>
+        <div class="field"><label>${t('fPriority')}</label><select id="q_priority">${pOpts}</select></div>
+        <div class="field"><label>${t('fStatus')}</label><select id="q_status">
+          <option value="Active" ${r.status==='Active'?'selected':''}>${t('active')}</option>
+          <option value="Inactive" ${r.status==='Inactive'?'selected':''}>${t('inactive')}</option></select></div>
+      </div>
+      <div class="divider"></div>
+      <div class="lang-section">
+        <div class="lang-section-head"><span class="lang-flag">EN</span>
+          <div style="font-weight:700;font-size:13px;">${t('englishVersion')}</div></div>
+        <div class="form-grid">${langBlock('en',r.en||blank)}</div>
+      </div>
+      <div class="lang-section" style="margin-top:16px;">
+        <div class="lang-section-head"><span class="lang-flag">AR</span>
+          <div style="font-weight:700;font-size:13px;">${t('arabicVersion')}</div></div>
+        <div class="form-grid">${langBlock('ar',r.ar||blank)}</div>
+      </div>
+      <div class="modal-actions" style="margin-top:20px;">
+        <button class="btn btn-ghost" onclick="cancelRule()">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="saveRule('${isNew?'new':r.id}')">${t('save')}</button>
+      </div>
+    </div>`;
+}
+function readRuleLang(L){
+  const g=id=>document.getElementById('q_'+L+'_'+id).value;
+  return {title:g('title').trim(),requirement:g('requirement').trim(),
+          expectedAction:g('action').trim(),rule:g('rule').trim(),notes:g('notes').trim()};
+}
+function saveRule(idOrNew){
+  if(!guard('quality.write')) return;
+  const en=readRuleLang('en'), ar=readRuleLang('ar');
+  const kid=document.getElementById('q_knowledge').value;
+  if((!en.title&&!ar.title)||!kid){ showToast(t('qualityRequiredFields')); return; }
+  const k=findItem(kid);
+  const payload={knowledgeId:kid,category:k?k.category:"",
+    priority:document.getElementById('q_priority').value,
+    status:document.getElementById('q_status').value, en, ar};
+  if(idOrNew==='new'){
+    qualityRules.push(Object.assign({id:nextId('q'),createdAt:todayStr()},payload));
+    showToast(t('ruleAdded'));
+  } else { Object.assign(findRule(idOrNew),payload); showToast(t('ruleUpdated')); }
+  state.editingRuleId=null; state.prefillKnowledgeId=null; render();
+}
+
+/* ======================= QUALITY ERROR CLASSIFICATION ======================= */
+const SEVERITIES=["Critical","High","Medium","Low"];
+function sevRank(x){ const i=SEVERITIES.indexOf(x); return i===-1?9:i; }
+function sortedErrors(list){
+  return [...list].sort((a,b)=>sevRank(a.severity)-sevRank(b.severity)||String(a.code).localeCompare(String(b.code)));
+}
+function findError(id){ return qualityErrors.find(e=>e.id===id); }
+
+/* Agent-facing: read-only reference. */
+function renderErrorsAgent(){
+  const q=normalize(state.errorFilter);
+  const list=sortedErrors(qualityErrors.filter(e=>e.status==='Active')).filter(e=>
+    !q||normalize(C(e,'title')).includes(q)||normalize(C(e,'description')).includes(q)||normalize(e.code).includes(q));
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('qualityErrorsTitle')}</h1>
+      <p class="page-sub">${t('qualityErrorsSub')}</p></div></div>
+    <div class="info-banner">${t('qualityErrorsIntroAgent')}</div>
+    <div class="toolbar"><div class="search-mini"><span>🔍</span>
+      <input dir="auto" placeholder="${t('filterErrors')}" value="${esc(state.errorFilter)}"
+        oninput="state.errorFilter=this.value;render();"></div></div>
+    ${list.length?list.map(e=>`
+      <div class="err-card">
+        <div class="err-head">
+          <div style="display:flex;gap:10px;align-items:flex-start;flex:1;min-width:200px;">
+            <span class="err-code">${esc(e.code)}</span>
+            <h3 class="err-title" dir="auto">${esc(C(e,'title'))}</h3>
+          </div>
+          <span class="prio prio-${String(e.severity).toLowerCase()}">${priorityLabel(e.severity)}</span>
+        </div>
+        ${C(e,'description')?`<div class="err-row"><b>${t('description')}</b>
+          <span dir="auto">${esc(C(e,'description'))}</span></div>`:''}
+        ${C(e,'example')?`<div class="err-row"><b>${t('example')}</b>
+          <div class="err-example"><span dir="auto">${esc(C(e,'example'))}</span></div></div>`:''}
+        ${C(e,'impact')?`<div class="err-row"><b>${t('impact')}</b>
+          <span dir="auto">${esc(C(e,'impact'))}</span></div>`:''}
+      </div>`).join('')
+      :`<div class="card empty-state"><div class="icon">⚠</div>${t('noQualityErrors')}</div>`}`;
+}
+
+/* Admin-facing: management table. */
+function renderErrorsAdmin(){
+  if(!can('qualityerrors')) return '';
+  const bySev=SEVERITIES.map(sv=>[priorityLabel(sv),qualityErrors.filter(e=>e.severity===sv).length]).filter(x=>x[1]>0);
+  const list=sortedErrors(qualityErrors);
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('qualityErrorsTitle')}</h1>
+      <p class="page-sub">${t('qualityErrorsSub')}</p></div>
+      <button class="btn btn-primary" onclick="openAddError()">+ ${t('addQualityError')}</button></div>
+    <div class="info-banner">${t('qualityErrorsIntroAdmin')}</div>
+    <div class="stat-grid">
+      <div class="card stat-card"><div class="n">${qualityErrors.length}</div><div class="l">${t('totalErrorTypes')}</div></div>
+      <div class="card stat-card"><div class="n">${qualityErrors.filter(e=>e.severity==='Critical').length}</div><div class="l">${t('priorityCritical')}</div></div>
+      <div class="card stat-card"><div class="n">${qualityErrors.filter(e=>e.severity==='High').length}</div><div class="l">${t('priorityHigh')}</div></div>
+      <div class="card stat-card"><div class="n">${qualityErrors.filter(e=>e.status==='Active').length}</div><div class="l">${t('active')}</div></div>
+    </div>
+    <div class="card" style="margin-bottom:15px;">
+    ${list.length?`<table><thead><tr>
+      <th>${t('colCode')}</th><th>${t('colTitle')}</th><th>${t('colSeverity')}</th>
+      <th>${t('colStatus')}</th><th>${t('colActions')}</th></tr></thead><tbody>
+      ${list.map(e=>`<tr>
+        <td><span class="err-code">${esc(e.code)}</span></td>
+        <td dir="auto"><div style="font-weight:600;color:var(--text);">${esc(C(e,'title'))}</div></td>
+        <td><span class="prio prio-${String(e.severity).toLowerCase()}">${priorityLabel(e.severity)}</span></td>
+        <td><span class="badge ${e.status==='Active'?'badge-active':'badge-inactive'}">${statusLabel(e.status)}</span></td>
+        <td class="row-actions">
+          <button class="btn btn-outline btn-sm" onclick="openEditError('${e.id}')">${t('edit')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleErrorStatus('${e.id}')">${e.status==='Active'?t('deactivate'):t('activate')}</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeleteError('${e.id}')">${t('del')}</button>
+        </td></tr>`).join('')}
+    </tbody></table>`:`<div class="empty-state"><div class="icon">⚠</div>${t('noQualityErrors')}</div>`}
+    </div>
+    ${bySev.length?`<div class="card card-pad"><h4 class="panel-title">${t('errorsBySeverity')}</h4>${bars(bySev)}</div>`:''}`;
+}
+function toggleErrorStatus(id){
+  if(!guard('qualityerrors.write'))return;
+  const e=findError(id); if(!e)return;
+  e.status=e.status==='Active'?'Inactive':'Active'; render(); showToast(t('markedAs')+' '+statusLabel(e.status));
+}
+function confirmDeleteError(id){ if(!guard('qualityerrors.write'))return; state.modal={type:'del-error',id}; render(); }
+function doDeleteError(id){
+  if(!guard('qualityerrors.write'))return;
+  qualityErrors=qualityErrors.filter(e=>e.id!==id); state.modal=null; render(); showToast(t('errorDeleted'));
+}
+function openAddError(){ if(!guard('qualityerrors.write'))return; state.editingErrorId='new'; render(); }
+function openEditError(id){ if(!guard('qualityerrors.write'))return; state.editingErrorId=id; render(); }
+function cancelError(){ state.editingErrorId=null; render(); }
+
+function renderErrorForm(){
+  const isNew=state.editingErrorId==='new';
+  const blank={title:"",description:"",example:"",impact:""};
+  const e=isNew?{code:"",severity:"High",category:"",status:"Active",
+                 en:Object.assign({},blank),ar:Object.assign({},blank)}
+               :findError(state.editingErrorId);
+  if(!e) return `<div class="card empty-state">${t('noQualityErrors')}</div>`;
+  const sevOpts=SEVERITIES.map(sv=>`<option value="${sv}" ${e.severity===sv?'selected':''}>${priorityLabel(sv)}</option>`).join('');
+  const block=(L,d)=>`
+    <div class="field form-full"><label>${t('fTitle')}</label>
+      <input id="e_${L}_title" dir="auto" value="${esc(d.title||'')}"></div>
+    <div class="field form-full"><label>${t('fErrorDescription')} <span class="field-hint">${t('hintErrorDescription')}</span></label>
+      <textarea id="e_${L}_description" dir="auto" rows="3">${esc(d.description||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fErrorExample')} <span class="field-hint">${t('hintErrorExample')}</span></label>
+      <textarea id="e_${L}_example" dir="auto" rows="2">${esc(d.example||'')}</textarea></div>
+    <div class="field form-full"><label>${t('fErrorImpact')} <span class="field-hint">${t('hintErrorImpact')}</span></label>
+      <textarea id="e_${L}_impact" dir="auto" rows="2">${esc(d.impact||'')}</textarea></div>`;
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${isNew?t('addQualityErrorTitle'):t('editQualityErrorTitle')}</h1></div></div>
+    <div class="card card-pad">
+      <h4 class="form-section-title">${t('generalInfo')}</h4>
+      <p class="form-section-desc">${t('qualityErrorsIntroAdmin')}</p>
+      <div class="form-grid">
+        <div class="field"><label>${t('fErrorCode')} <span class="field-hint">${t('hintErrorCode')}</span></label>
+          <input id="e_code" value="${esc(e.code||'')}" placeholder="QE-01"></div>
+        <div class="field"><label>${t('fSeverity')}</label><select id="e_severity">${sevOpts}</select></div>
+        <div class="field"><label>${t('fCategory')}</label><input id="e_category" dir="auto" value="${esc(e.category||'')}"></div>
+        <div class="field"><label>${t('fStatus')}</label><select id="e_status">
+          <option value="Active" ${e.status==='Active'?'selected':''}>${t('active')}</option>
+          <option value="Inactive" ${e.status==='Inactive'?'selected':''}>${t('inactive')}</option></select></div>
+      </div>
+      <div class="divider"></div>
+      <div class="lang-section">
+        <div class="lang-section-head"><span class="lang-flag">EN</span>
+          <div style="font-weight:700;font-size:13px;">${t('englishVersion')}</div></div>
+        <div class="form-grid">${block('en',e.en||blank)}</div>
+      </div>
+      <div class="lang-section" style="margin-top:16px;">
+        <div class="lang-section-head"><span class="lang-flag">AR</span>
+          <div style="font-weight:700;font-size:13px;">${t('arabicVersion')}</div></div>
+        <div class="form-grid">${block('ar',e.ar||blank)}</div>
+      </div>
+      <div class="modal-actions" style="margin-top:20px;">
+        <button class="btn btn-ghost" onclick="cancelError()">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="saveError('${isNew?'new':e.id}')">${t('save')}</button>
+      </div>
+    </div>`;
+}
+function readErrLang(L){
+  const g=id=>document.getElementById('e_'+L+'_'+id).value;
+  return {title:g('title').trim(),description:g('description').trim(),
+          example:g('example').trim(),impact:g('impact').trim()};
+}
+function saveError(idOrNew){
+  if(!guard('qualityerrors.write')) return;
+  const en=readErrLang('en'), ar=readErrLang('ar');
+  const code=document.getElementById('e_code').value.trim();
+  if(!code||(!en.title&&!ar.title)){ showToast(t('errorRequiredFields')); return; }
+  const payload={code,severity:document.getElementById('e_severity').value,
+    category:document.getElementById('e_category').value.trim(),
+    status:document.getElementById('e_status').value, en, ar};
+  if(idOrNew==='new'){
+    qualityErrors.push(Object.assign({id:nextId('qe'),createdAt:todayStr()},payload));
+    showToast(t('errorAdded'));
+  } else { Object.assign(findError(idOrNew),payload); showToast(t('errorUpdated')); }
+  state.editingErrorId=null; render();
+}
+
+/* ============================== USERS ============================== */
+function renderUsersList(){
+  if(!can('users')) return '';
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('usersTitle')}</h1><p class="page-sub">${t('usersSub')}</p></div>
+      <button class="btn btn-primary" onclick="openAddUser()">+ ${t('addUser')}</button></div>
+    <div class="info-banner">${t('securityNotice')}</div>
+    <div class="card">${users.length?`
+      <table><thead><tr>
+        <th>${t('colName')}</th><th>${t('colUsername')}</th><th>${t('colRole')}</th>
+        <th>${t('colStatus')}</th><th>${t('colCreated')}</th><th>${t('colLastLogin')}</th><th>${t('colActions')}</th>
+      </tr></thead><tbody>
+      ${users.map(u=>`<tr>
+        <td><div class="user-col"><div class="mini-avatar">${esc((u.name||'?').charAt(0).toUpperCase())}</div>
+          <span dir="auto" style="font-weight:600;color:var(--text);">${esc(u.name)}</span></div></td>
+        <td>${esc(u.username)}</td>
+        <td><span class="role-pill role-${u.role}">${roleLabel(u.role)}</span></td>
+        <td><span class="badge ${u.status==='Active'?'badge-active':'badge-inactive'}">${statusLabel(u.status)}</span></td>
+        <td>${esc(u.createdAt)}</td>
+        <td style="color:var(--text-muted)">${u.lastLogin?esc(u.lastLogin):t('never')}</td>
+        <td class="row-actions">
+          <button class="btn btn-outline btn-sm" onclick="openEditUser('${u.id}')">${t('edit')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="openResetPassword('${u.id}')">${t('resetPassword')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleUserStatus('${u.id}')">${u.status==='Active'?t('deactivate'):t('activate')}</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeleteUser('${u.id}')">${t('del')}</button>
+        </td></tr>`).join('')}
+      </tbody></table>`:`<div class="empty-state"><div class="icon">👥</div>${t('noUsers')}</div>`}
+    </div>`;
+}
+function activeAdminCount(){ return users.filter(u=>u.role==='admin'&&u.status==='Active').length; }
+function toggleUserStatus(id){
+  if(!guard('users.write'))return;
+  const u=findUser(id); if(!u)return;
+  if(u.id===state.session.userId){ showToast(t('cannotDeactivateSelf')); return; }
+  if(u.status==='Active'&&u.role==='admin'&&activeAdminCount()<=1){ showToast(t('lastAdminWarning')); return; }
+  const newStatus = u.status==='Active'?'Inactive':'Active';
+  u.status=newStatus; render(); showToast(t('markedAs')+' '+statusLabel(newStatus));
+  if(db) db.from('profiles').update({status:newStatus}).eq('id', id)
+    .then(({error})=>{ if(error){ u.status = newStatus==='Active'?'Inactive':'Active'; showToast(error.message); render(); } });
+}
+/* Deleting a Supabase Auth account needs the Admin API (service_role key),
+   which this frontend intentionally never holds — per the security
+   requirements, that key can never sit in browser-shipped code. So this
+   stays a Supabase Dashboard action for now (Authentication → Users →
+   delete). Deactivating via the button above is the safe in-app equivalent
+   — it blocks login immediately without needing that privileged key. */
+function confirmDeleteUser(id){
+  if(!guard('users.write'))return;
+  showToast(t('manageInDashboard'));
+}
+function openAddUser(){
+  if(!guard('users.write'))return;
+  showToast(t('manageInDashboard'));
+}
+function openEditUser(id){ if(!guard('users.write'))return; state.editingUserId=id; render(); }
+function cancelUser(){ state.editingUserId=null; render(); }
+function renderUserForm(){
+  const u=findUser(state.editingUserId);
+  if(!u) return `<div class="card empty-state">${t('noUsers')}</div>`;
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('editUserTitle')}</h1></div></div>
+    <div class="card card-pad" style="max-width:560px;">
+      <div class="field"><label>${t('colName')}</label><input id="u_name" dir="auto" value="${esc(u.name)}"></div>
+      <div class="field"><label>${t('username')}</label><input id="u_username" value="${esc(u.username)}" disabled></div>
+      <div class="field"><label>${t('fRole')}</label><select id="u_role">
+        <option value="employee" ${u.role==='employee'?'selected':''}>${t('roleEmployee')}</option>
+        <option value="admin" ${u.role==='admin'?'selected':''}>${t('roleAdmin')}</option></select></div>
+      <div class="field"><label>${t('fStatus')}</label><select id="u_status">
+        <option value="Active" ${u.status==='Active'?'selected':''}>${t('active')}</option>
+        <option value="Inactive" ${u.status==='Inactive'?'selected':''}>${t('inactive')}</option></select></div>
+      <div class="modal-actions" style="margin-top:8px;">
+        <button class="btn btn-ghost" onclick="cancelUser()">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="saveUser('${u.id}')">${t('save')}</button>
+      </div>
+    </div>`;
+}
+/* Editing only touches `profiles` (name/role/status) — creating accounts
+   and setting their first password happens in the Supabase Dashboard,
+   see the notes above. */
+async function saveUser(id){
+  if(!guard('users.write')) return;
+  const u=findUser(id); if(!u) return;
+  const name=document.getElementById('u_name').value.trim();
+  const role=document.getElementById('u_role').value;
+  const status=document.getElementById('u_status').value;
+  if(!name){ showToast(t('usernameRequired')); return; }
+  if(u.id===state.session.userId&&(role!=='admin'||status!=='Active')){ showToast(t('cannotDeactivateSelf')); return; }
+  if(u.role==='admin'&&u.status==='Active'&&(role!=='admin'||status!=='Active')&&activeAdminCount()<=1){
+    showToast(t('lastAdminWarning')); return; }
+  const prev={name:u.name,role:u.role,status:u.status};
+  Object.assign(u,{name,role,status});
+  if(u.id===state.session.userId) state.session.name=name;
+  state.editingUserId=null; render(); showToast(t('userUpdated'));
+  if(db){
+    const {error} = await db.from('profiles').update({name,role,status}).eq('id', id);
+    if(error){ Object.assign(u,prev); showToast(error.message); render(); }
+  }
+}
+/* Password resets need the Admin API too (or the person resetting their
+   own password via Supabase's normal "forgot password" email flow) — not
+   something this frontend can do with only the public anon key. */
+function openResetPassword(id){
+  if(!guard('users.write'))return;
+  showToast(t('manageInDashboard'));
+}
+
+/* ============================== CATEGORIES / TEAMS ============================== */
+function renderSimpleList(kind){
+  if(!can(kind)) return '';
+  const list=kind==='categories'?categories:teams;
+  const ph=kind==='categories'?t('addCategoryPlaceholder'):t('addTeamPlaceholder');
+  const addLbl=kind==='categories'?t('addCategory'):t('addTeam');
+  const empty=kind==='categories'?t('noCategories'):t('noTeams');
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${kind==='categories'?t('categoriesTitle'):t('teamsTitle')}</h1>
+      <p class="page-sub">${kind==='categories'?t('categoriesSub'):t('teamsSub')}</p></div></div>
+    <div class="toolbar">
+      <div class="search-mini" style="flex:1;"><span>+</span>
+        <input id="newEntry" dir="auto" placeholder="${ph}" onkeydown="if(event.key==='Enter')addEntry('${kind}')"></div>
+      <button class="btn btn-primary" onclick="addEntry('${kind}')">${addLbl}</button></div>
+    <div class="card card-pad">
+      ${list.length?list.map((n,i)=>`<div class="manage-list-item">
+        <input dir="auto" value="${esc(n)}" onchange="renameEntry('${kind}',${i},this.value)">
+        <button class="btn btn-danger btn-sm" onclick="removeEntry('${kind}',${i})">${t('del')}</button>
+      </div>`).join(''):`<div class="empty-state">${empty}</div>`}
+    </div>`;
+}
+function addEntry(kind){
+  if(!guard(kind+'.write'))return;
+  const el=document.getElementById('newEntry'); const v=el.value.trim(); if(!v)return;
+  const arr=kind==='categories'?categories:teams;
+  if(arr.includes(v)){ showToast(t('alreadyExists')); return; }
+  arr.push(v); render(); showToast(t('added'));
+}
+function renameEntry(kind,i,v){
+  if(!guard(kind+'.write'))return;
+  const arr=kind==='categories'?categories:teams; const old=arr[i]; v=v.trim();
+  if(!v){ render(); return; }
+  arr[i]=v;
+  knowledgeItems.forEach(it=>{
+    if(kind==='categories'&&it.category===old) it.category=v;
+    if(kind==='teams'&&it.responsibleTeam===old) it.responsibleTeam=v;
+  });
+  if(kind==='categories') qualityRules.forEach(r=>{ if(r.category===old) r.category=v; });
+  showToast(t('updated'));
+}
+function removeEntry(kind,i){
+  if(!guard(kind+'.write'))return;
+  const arr=kind==='categories'?categories:teams; arr.splice(i,1); render(); showToast(t('removed'));
+}
+
+/* ============================== MISSING KNOWLEDGE ============================== */
+function renderMissing(){
+  if(!can('missing')) return '';
+  if(!missingRequests.length) return `<div class="page-head"><div>
+      <h1 class="page-title">${t('missingTitle')}</h1><p class="page-sub">${t('missingSub')}</p></div></div>
+    <div class="card empty-state"><div class="icon">⚠</div>${t('noMissing')}</div>`;
+  const sorted=[...missingRequests].sort((a,b)=>b.count-a.count);
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('missingTitle')}</h1><p class="page-sub">${t('missingSub')}</p></div></div>
+    <div class="card"><table><thead><tr>
+      <th>${t('colQuestion')}</th><th>${t('colCount')}</th><th>${t('colDate')}</th>
+      <th>${t('colStatus')}</th><th>${t('colActions')}</th></tr></thead><tbody>
+      ${sorted.map(m=>`<tr>
+        <td dir="auto">${esc(m.question)}</td><td>${m.count}</td><td>${esc(m.date)}</td>
+        <td><span class="status-pill status-${m.status.toLowerCase()}">${statusLabel(m.status)}</span></td>
+        <td class="row-actions">
+          <button class="btn btn-outline btn-sm" onclick="setMissing('${m.id}','Added')">${t('markAdded')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="setMissing('${m.id}','Ignored')">${t('ignore')}</button>
+        </td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function setMissing(id,s){
+  if(!guard('missing.write'))return;
+  const m=missingRequests.find(x=>x.id===id); if(!m)return;
+  m.status=s; render(); showToast(t('markedAs')+' '+statusLabel(s));
+}
+
+/* ============================== SETTINGS ============================== */
+function renderSettings(){
+  if(!can('settings')) return '';
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('settingsTitle')}</h1><p class="page-sub">${t('settingsSub')}</p></div></div>
+    <div class="card card-pad" style="max-width:620px;margin-bottom:16px;">
+      <div class="field"><label>${t('defaultLanguage')}</label>
+        <select id="s_lang" onchange="saveSettings()">
+          <option value="en" ${settings.defaultLanguage==='en'?'selected':''}>${t('english')}</option>
+          <option value="ar" ${settings.defaultLanguage==='ar'?'selected':''}>${t('arabic')}</option>
+        </select>
+        <div class="field-hint" style="margin-top:6px;">${t('defaultLanguageHint')}</div></div>
+    </div>
+    <div class="card card-pad" style="max-width:620px;margin-bottom:16px;">
+      <h4 class="form-section-title">${t('typesTitle')}</h4>
+      <p class="form-section-desc">${t('typesSub')}</p>
+      <div class="toolbar"><div class="search-mini" style="flex:1;"><span>+</span>
+        <input id="newType" dir="auto" placeholder="${t('addTypePlaceholder')}" onkeydown="if(event.key==='Enter')addType()"></div>
+        <button class="btn btn-primary btn-sm" onclick="addType()">${t('addType')}</button></div>
+      ${knowledgeTypes.map((ty,i)=>`<div class="manage-list-item">
+        <span dir="auto" style="font-weight:600;font-size:13.5px;">${esc(ty[state.lang]||ty.en)}</span>
+        <button class="btn btn-danger btn-sm" onclick="removeType(${i})">${t('del')}</button></div>`).join('')}
+    </div>
+    <div class="card card-pad" style="max-width:620px;margin-bottom:16px;">
+      <h4 class="form-section-title">${t('syncSection')}</h4>
+      <p class="form-section-desc">${db?t('syncLiveHint'):t('syncLocalHint')}</p>
+      <div class="switch-row">
+        <div style="display:flex;align-items:center;gap:9px;">
+          <span class="sync-dot ${db?'on':'off'}" style="display:inline-block;"></span>
+          <div><div style="font-weight:600;">${db?t('syncLive'):t('syncLocal')}</div>
+          ${state.lastSync?`<div class="field-hint">${t('syncStatus')}: ${esc(state.lastSync)}</div>`:''}</div>
+        </div>
+        ${db?`<button class="btn btn-outline btn-sm" onclick="syncNow()">${t('syncNow')}</button>`:''}
+      </div>
+    </div>
+    <div class="info-banner" style="max-width:620px;">${t('securityNotice')}</div>
+    <div class="info-banner" style="max-width:620px;">${t('demoNotice')}</div>`;
+}
+function saveSettings(){
+  if(!guard('settings.write'))return;
+  settings.defaultLanguage=document.getElementById('s_lang').value;
+  showToast(t('settingsSaved'));
+}
+function addType(){
+  if(!guard('types.write'))return;
+  const el=document.getElementById('newType'); const v=el.value.trim(); if(!v)return;
+  const id=v.toLowerCase().replace(/\s+/g,'-');
+  if(knowledgeTypes.find(x=>x.id===id)){ showToast(t('alreadyExists')); return; }
+  knowledgeTypes.push({id,en:v,ar:v}); render(); showToast(t('added'));
+}
+function removeType(i){
+  if(!guard('types.write'))return;
+  knowledgeTypes.splice(i,1); render(); showToast(t('removed'));
+}
+
+/* ============================== MODALS ============================== */
+function renderModal(){
+  const m=state.modal;
+  const shell=(inner,wide)=>`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal ${wide?'wide':''}">${inner}</div></div>`;
+  if(m.type==='del-kb'){
+    const it=findItem(m.id);
+    return shell(`<h3>${t('deleteItemTitle')}</h3>
+      <p dir="auto">"${esc(it?C(it,'title'):'')}" — ${t('deleteItemBody')}</p>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">${t('cancel')}</button>
+      <button class="btn btn-danger-solid" onclick="doDeleteKb('${m.id}')">${t('del')}</button></div>`);
+  }
+  if(m.type==='del-rule'){
+    const r=findRule(m.id);
+    return shell(`<h3>${t('deleteRuleTitle')}</h3>
+      <p dir="auto">"${esc(r?C(r,'title'):'')}" — ${t('deleteRuleBody')}</p>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">${t('cancel')}</button>
+      <button class="btn btn-danger-solid" onclick="doDeleteRule('${m.id}')">${t('del')}</button></div>`);
+  }
+  if(m.type==='del-error'){
+    const e=findError(m.id);
+    return shell(`<h3>${t('deleteErrorTitle')}</h3>
+      <p dir="auto">"${esc(e?C(e,'title'):'')}" — ${t('deleteErrorBody')}</p>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">${t('cancel')}</button>
+      <button class="btn btn-danger-solid" onclick="doDeleteError('${m.id}')">${t('del')}</button></div>`);
+  }
+  if(m.type==='view'){
+    const it=findItem(m.id);
+    return shell(`<div class="modal-scroll">${it?renderResultCard(it,{noFav:true}):''}</div>
+      <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">${t('cancel')}</button></div>`,true);
+  }
+  return '';
+}
+function closeModal(){ state.modal=null; render(); }
+
+/* ============================== BOOT ==============================
+   Initialize Supabase, restore an existing session if the browser still
+   has one (the Supabase SDK persists that itself), and load the shared
+   knowledge base + this user's own favorites/history once we know who
+   they are. Before anyone signs in, RLS won't even let us read `kb_data`
+   — that's by design — so the built-in demo content shows until login. */
+
+/* ========================= SUPABASE CONFIG =========================
+   From your project: Settings → API Keys. The "Publishable" key (or
+   older projects: the `anon` `public` key) is meant to be public in
+   frontend code — real protection comes from the RLS policies we set up,
+   not from hiding this value. NEVER put a "Secret"/`service_role` key
+   here or anywhere in this file. */
+const SUPABASE_URL = "https://pjhicbaptolerzeziyrp.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_XQeN3vifkRIpXHXHAhS6GA_DPoV4oMd";
+
+/* Loads the shared kb_data row (only readable once authenticated). If it's
+   still the empty default an admin's first login seeds it with today's
+   built-in demo content, exactly as the earlier Firebase draft did —
+   nothing invented, just what was already here. Then subscribes to live
+   updates from every other viewer. */
+async function fetchKbData(){
+  if(!db) return;
+  try{
+    const {data,error} = await db.from(KB_TABLE).select('data').eq('id',1).single();
+    if(!error && data){
+      const isEmpty = !data.data || Object.keys(data.data).length===0;
+      if(isEmpty){
+        if(state.session && state.session.role==='admin'){
+          await db.from(KB_TABLE).update({data:snapshot()}).eq('id',1);
+        }
+      } else {
+        applySnapshot(data.data);
+      }
+      lastSerialized = JSON.stringify(snapshot());
+      state.lastSync = nowTimeStr();
+    }
+  }catch(e){ /* proceed with whatever's already in memory */ }
+  subscribeRemote();
+}
+
+(async function init(){
+  const r=document.getElementById('htmlRoot');
+  r.setAttribute('lang',state.lang);
+  r.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
+
+  if(SUPABASE_URL && SUPABASE_ANON_KEY && typeof window.supabase!=='undefined'){
+    try{ db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
+    catch(e){ db = null; }
+  }
+
+  if(db){
+    try{
+      const {data:{session}} = await db.auth.getSession();
+      if(session){
+        const {data:profile} = await db.from('profiles').select('*').eq('id', session.user.id).single();
+        if(profile && profile.status==='Active'){
+          state.session={userId:profile.id, name:profile.name, username:profile.username, role:profile.role};
+          state.view=defaultViewFor(profile.role);
+          await Promise.all([
+            fetchMyFavorites(), fetchMyHistory(), fetchKbData(),
+            profile.role==='admin' ? fetchProfiles() : Promise.resolve()
+          ]);
+        } else {
+          await db.auth.signOut();
+        }
+      }
+    }catch(e){ /* proceed logged out — login screen will show */ }
+  }
+
+  state.lang = settings.defaultLanguage || state.lang;
+  r.setAttribute('lang',state.lang);
+  r.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
+
+  lastSerialized = JSON.stringify(snapshot());
+  booted = true;
+  render();
+})();
+</script>
+</body>
+</html>
