@@ -1998,7 +1998,7 @@ function renderKnowledgeList(){
     const item = findItem(state.viewingKbId);
     if(!item) { state.viewingKbId=null; }
     else return `<div class="page-head"><div>
-        <button class="btn btn-ghost btn-sm" onclick="state.viewingKbId=null;render();">← ${t('back')}</button>
+        <button class="btn btn-ghost btn-sm" onclick="const _id=state.viewingKbId;state.viewingKbId=null;render();scrollToRow('row-kb-'+_id);">← ${t('back')}</button>
       </div></div>${renderResultCard(item)}`;
   }
   return `<div class="page-head"><div>
@@ -2027,7 +2027,7 @@ function kbRows(rows, isAdmin){
     </tr></thead><tbody>
     ${rows.map(it=>{
       const n=qualityRules.filter(q=>q.knowledgeId===it.id).length;
-      return `<tr ${isAdmin?'':`class="kb-row-clickable" onclick="state.viewingKbId='${it.id}';render();"`}>
+      return `<tr id="row-kb-${esc(it.id)}" ${isAdmin?'':`class="kb-row-clickable" onclick="state.viewingKbId='${it.id}';render();"`}>
         <td dir="auto"><div style="font-weight:600;color:var(--text);">${esc(C(it,'title'))}</div>
           ${it.needsClarification?`<span class="clarify-flag" style="margin-top:4px;display:inline-block;">${t('needsClarificationFlag')}</span>`:''}</td>
         <td>${esc(it.category)}</td>
@@ -2063,8 +2063,24 @@ function doDeleteKb(id){
   state.modal=null; render(); showToast(t('itemDeleted'));
 }
 function openAddKnowledge(){ if(!guard('knowledge.write'))return; state.editingItemId='new'; render(); }
+/* The page has one long scrolling column (.main has no overflow of its
+   own — the whole document scrolls). Opening an edit form swaps the short
+   list for a much taller page, and closing it swaps back. The browser
+   keeps the same raw scrollY pixel value across that swap, which lands on
+   a completely different, usually much higher, spot in the shorter list —
+   exactly the "jumps back to the top" bug. Scrolling the specific row
+   back into view after the form closes fixes it regardless of how tall
+   either page happens to be. */
+function scrollToRow(rowId){
+  requestAnimationFrame(()=>{
+    document.getElementById(rowId)?.scrollIntoView({block:'center'});
+  });
+}
 function openEditKnowledge(id){ if(!guard('knowledge.write'))return; state.editingItemId=id; render(); }
-function cancelKb(){ state.editingItemId=null; render(); }
+function cancelKb(){
+  const id=state.editingItemId; state.editingItemId=null; render();
+  if(id && id!=='new') scrollToRow('row-kb-'+id);
+}
 
 function langFields(L, data){
   const P=L.toUpperCase();
@@ -2200,6 +2216,7 @@ function saveKb(idOrNew){
     Object.assign(findItem(idOrNew),payload); showToast(t('itemUpdated'));
   }
   state.editingItemId=null; render();
+  if(idOrNew!=='new') scrollToRow('row-kb-'+idOrNew);
 }
 
 /* ============================== QUALITY ============================== */
@@ -2226,7 +2243,7 @@ function qualityRows(rows){
       <th>${t('colPriority')}</th><th>${t('colStatus')}</th><th>${t('colActions')}</th></tr></thead><tbody>
     ${rows.map(r=>{
       const k=findItem(r.knowledgeId);
-      return `<tr>
+      return `<tr id="row-rule-${esc(r.id)}">
         <td dir="auto"><div style="font-weight:600;color:var(--text);">${esc(C(r,'title'))}</div></td>
         <td dir="auto">${k?esc(C(k,'title')):`<span style="color:var(--text-muted)">—</span>`}</td>
         <td>${esc(r.category)}</td>
@@ -2251,7 +2268,10 @@ function doDeleteRule(id){
 }
 function openAddRule(){ if(!guard('quality.write'))return; state.editingRuleId='new'; render(); }
 function openEditRule(id){ if(!guard('quality.write'))return; state.editingRuleId=id; render(); }
-function cancelRule(){ state.editingRuleId=null; state.prefillKnowledgeId=null; render(); }
+function cancelRule(){
+  const id=state.editingRuleId; state.editingRuleId=null; state.prefillKnowledgeId=null; render();
+  if(id && id!=='new') scrollToRow('row-rule-'+id);
+}
 
 function renderQualityForm(){
   const isNew=state.editingRuleId==='new';
@@ -2323,6 +2343,7 @@ function saveRule(idOrNew){
     showToast(t('ruleAdded'));
   } else { Object.assign(findRule(idOrNew),payload); showToast(t('ruleUpdated')); }
   state.editingRuleId=null; state.prefillKnowledgeId=null; render();
+  if(idOrNew!=='new') scrollToRow('row-rule-'+idOrNew);
 }
 
 /* ======================= QUALITY ERROR CLASSIFICATION ======================= */
@@ -2384,7 +2405,7 @@ function renderErrorsAdmin(){
     ${list.length?`<table><thead><tr>
       <th>${t('colCode')}</th><th>${t('colTitle')}</th><th>${t('colSeverity')}</th>
       <th>${t('colStatus')}</th><th>${t('colActions')}</th></tr></thead><tbody>
-      ${list.map(e=>`<tr>
+      ${list.map(e=>`<tr id="row-error-${esc(e.id)}">
         <td><span class="err-code">${esc(e.code)}</span></td>
         <td dir="auto"><div style="font-weight:600;color:var(--text);">${esc(C(e,'title'))}</div></td>
         <td><span class="prio prio-${String(e.severity).toLowerCase()}">${priorityLabel(e.severity)}</span></td>
@@ -2410,7 +2431,10 @@ function doDeleteError(id){
 }
 function openAddError(){ if(!guard('qualityerrors.write'))return; state.editingErrorId='new'; render(); }
 function openEditError(id){ if(!guard('qualityerrors.write'))return; state.editingErrorId=id; render(); }
-function cancelError(){ state.editingErrorId=null; render(); }
+function cancelError(){
+  const id=state.editingErrorId; state.editingErrorId=null; render();
+  if(id && id!=='new') scrollToRow('row-error-'+id);
+}
 
 function renderErrorForm(){
   const isNew=state.editingErrorId==='new';
@@ -2478,6 +2502,7 @@ function saveError(idOrNew){
     showToast(t('errorAdded'));
   } else { Object.assign(findError(idOrNew),payload); showToast(t('errorUpdated')); }
   state.editingErrorId=null; render();
+  if(idOrNew!=='new') scrollToRow('row-error-'+idOrNew);
 }
 
 /* ============================== USERS ============================== */
@@ -2492,7 +2517,7 @@ function renderUsersList(){
         <th>${t('colName')}</th><th>${t('colUsername')}</th><th>${t('colRole')}</th>
         <th>${t('colStatus')}</th><th>${t('colCreated')}</th><th>${t('colLastLogin')}</th><th>${t('colActions')}</th>
       </tr></thead><tbody>
-      ${users.map(u=>`<tr>
+      ${users.map(u=>`<tr id="row-user-${esc(u.id)}">
         <td><div class="user-col"><div class="mini-avatar">${esc((u.name||'?').charAt(0).toUpperCase())}</div>
           <span dir="auto" style="font-weight:600;color:var(--text);">${esc(u.name)}</span></div></td>
         <td>${esc(u.username)}</td>
@@ -2535,7 +2560,10 @@ function openAddUser(){
   showToast(t('manageInDashboard'));
 }
 function openEditUser(id){ if(!guard('users.write'))return; state.editingUserId=id; render(); }
-function cancelUser(){ state.editingUserId=null; render(); }
+function cancelUser(){
+  const id=state.editingUserId; state.editingUserId=null; render();
+  if(id && id!=='new') scrollToRow('row-user-'+id);
+}
 function renderUserForm(){
   const u=findUser(state.editingUserId);
   if(!u) return `<div class="card empty-state">${t('noUsers')}</div>`;
@@ -2573,6 +2601,7 @@ async function saveUser(id){
   Object.assign(u,{name,role,status});
   if(u.id===state.session.userId) state.session.name=name;
   state.editingUserId=null; render(); showToast(t('userUpdated'));
+  scrollToRow('row-user-'+id);
   if(db){
     const {error} = await db.from('profiles').update({name,role,status}).eq('id', id);
     if(error){ Object.assign(u,prev); showToast(error.message); render(); }
