@@ -880,6 +880,24 @@ en:{
   workspace:"Workspace", administration:"Administration",
   navSearch:"Search", navFavorites:"Favorites", navHistory:"History",
   navMaxPayCalc:"MaxPay Calculator",
+  navMarginCalc:"Margin & Max Lot Calculator",
+  mgcTitle:"Margin & Max Lot Calculator", mgcSub:"Margin = pair price × contract size × lots ÷ leverage. Contract sizes and leverages come from the company sheets.",
+  mgcSearch:"Search instrument", mgcSearchPh:"Type a symbol, e.g. EURUSD...", mgcSymbol:"Pair / instrument",
+  mgcTier:"Client account leverage", mgcLots:"Lot size (minimum 0.01)", mgcPrice:"Current pair price",
+  mgcLev:"Applied leverage (1 : ?)", mgcLevSheet:"from the leverage sheet — fixed, can't be edited",
+  mgcLevMissing:"This instrument has no leverage in the sheet for this tier, so it can't be calculated.",
+  mgcConv:"Pair currency → USD conversion rate",
+  mgcConvPerUnit:"Type the price of {Q}USD (how many dollars in 1 {Q}).", mgcConvPerUsd:"Type the price of USD{Q} (how many {Q} in 1 dollar).",
+  mgcConvAuto:"No conversion needed: the base currency is USD, so the pair's own price is used automatically.",
+  mgcClientBalance:"Client balance in USD", mgcTabMargin:"Margin", mgcTabMaxLot:"Max lot", mgcNeedBalance:"Enter the client's balance to get the maximum lot.",
+  mgcFacts:"Contract size", mgcQuote:"Pair currency", mgcLevUsed:"Leverage used",
+  mgcPerLot:"Margin for 1 lot", mgcTotal:"Margin for {L} lot(s)", mgcInQuote:"in {Q}", mgcInUsd:"in USD",
+  mgcMaxLot:"Maximum lot the balance allows", mgcMinNeeded:"Margin needed for the minimum 0.01 lot",
+  mgcTooLow:"The balance isn't enough even for the minimum lot (0.01).",
+  mgcNoContract:"The contract size for this instrument is not in the sheet, so it can't be calculated.",
+  mgcNeedPrice:"Enter the pair price to calculate.", mgcNeedConv:"Enter the conversion rate to get the USD amount.",
+  mgcBadLots:"The lot size must be 0.01 or more.", mgcNoMatch:"No instrument matches your search.",
+  mgcNote:"This is the maximum from a margin point of view only — the lot limit of the account type (Standard and Fy up to 10 lots, Zero up to 15, EA no limit) still applies.",
   mpcTitle:"MaxPay Calculator (USD ⇄ IQD)", mpcSub:"Work out how many Iraqi dinars the client pays for a deposit or receives for a withdrawal — and the other way round.",
   mpcDeposit:"Deposit", mpcWithdraw:"Withdrawal",
   mpcUsd:"Amount in dollars ($)", mpcIqd:"Amount in Iraqi dinars (IQD)",
@@ -1061,6 +1079,24 @@ ar:{
   workspace:"مساحة العمل", administration:"الإدارة",
   navSearch:"البحث", navFavorites:"المفضلة", navHistory:"السجل",
   navMaxPayCalc:"حاسبة MaxPay",
+  navMarginCalc:"حاسبة الهامش وأقصى لوت",
+  mgcTitle:"حاسبة الهامش وأقصى لوت", mgcSub:"الهامش = سعر الزوج × حجم العقد × اللوت ÷ الرافعة. حجم العقد والرافعات مأخوذين من شيتات الشركة.",
+  mgcSearch:"بحث عن أداة", mgcSearchPh:"اكتب رمز الزوج، مثلًا EURUSD...", mgcSymbol:"الزوج / الأداة",
+  mgcTier:"رافعة حساب العميل", mgcLots:"حجم اللوت (الحد الأدنى 0.01)", mgcPrice:"سعر الزوج الحالي",
+  mgcLev:"الرافعة المطبقة (1 : ؟)", mgcLevSheet:"من شيت الرافعات — ثابتة ومينفعش تتعدل",
+  mgcLevMissing:"الأداة دي مفيهاش رافعة في الشيت للمستوى ده، فمينفعش تتحسب.",
+  mgcConv:"سعر تحويل عملة الزوج لدولار",
+  mgcConvPerUnit:"اكتب سعر {Q}USD (كم دولار في 1 {Q}).", mgcConvPerUsd:"اكتب سعر USD{Q} (كم {Q} في 1 دولار).",
+  mgcConvAuto:"مفيش حاجة تكتبها: العملة الأساسية دولار، فبيستخدم سعر الزوج نفسه تلقائيًا.",
+  mgcClientBalance:"رصيد العميل بالدولار", mgcTabMargin:"حساب الهامش", mgcTabMaxLot:"أقصى لوت", mgcNeedBalance:"اكتب رصيد العميل عشان يظهر أقصى لوت.",
+  mgcFacts:"حجم العقد", mgcQuote:"عملة الزوج", mgcLevUsed:"الرافعة المستخدمة",
+  mgcPerLot:"هامش اللوت الواحد", mgcTotal:"الهامش لـ {L} لوت", mgcInQuote:"بعملة {Q}", mgcInUsd:"بالدولار",
+  mgcMaxLot:"أقصى لوت يسمح بيه الرصيد", mgcMinNeeded:"الهامش المطلوب لأقل لوت 0.01",
+  mgcTooLow:"الرصيد مش كفاية حتى لأقل لوت (0.01).",
+  mgcNoContract:"حجم العقد للأداة دي مش موجود في الشيت، فمينفعش تتحسب.",
+  mgcNeedPrice:"اكتب سعر الزوج عشان تتحسب.", mgcNeedConv:"اكتب سعر التحويل عشان يظهر المبلغ بالدولار.",
+  mgcBadLots:"حجم اللوت لازم يكون 0.01 أو أكتر.", mgcNoMatch:"مفيش أداة مطابقة للبحث.",
+  mgcNote:"ده أقصى لوت من ناحية الهامش بس — حد اللوت لنوع الحساب (Standard وFy حتى 10 لوت، Zero حتى 15، EA بدون حد) لسه بيتطبق.",
   mpcTitle:"حاسبة MaxPay (دولار ⇄ دينار)", mpcSub:"احسب كم دينار عراقي يدفعها العميل عند الإيداع أو يستلمها عند السحب، والعكس.",
   mpcDeposit:"إيداع", mpcWithdraw:"سحب",
   mpcUsd:"المبلغ بالدولار ($)", mpcIqd:"المبلغ بالدينار العراقي (IQD)",
@@ -1278,9 +1314,9 @@ function roleLabel(r){ return r==='admin'?t('roleAdmin'):t('roleEmployee'); }
    convenience layer on top of that — they keep the UI honest and give
    instant feedback, but the real boundary is now in the database. */
 const PERMISSIONS = {
-  admin:    ["search","favorites","history","qualityerrors","maxpaycalc","dashboard","knowledge","quality",
+  admin:    ["search","favorites","history","qualityerrors","maxpaycalc","margincalc","dashboard","knowledge","quality",
              "users","categories","teams","searchhistory","missing","statistics","settings"],
-  employee: ["search","favorites","history","qualityerrors","knowledge","maxpaycalc"]
+  employee: ["search","favorites","history","qualityerrors","knowledge","maxpaycalc","margincalc"]
 };
 const ADMIN_ONLY_ACTIONS = ["knowledge.write","quality.write","qualityerrors.write","users.write",
                             "categories.write","teams.write","types.write","settings.write","missing.write"];
@@ -1592,6 +1628,7 @@ function renderSidebar(){
       ${!isAdmin?item('knowledge','📚',t('navKnowledge')):''}
       ${!isAdmin?item('qualityerrors','⚠',t('navQualityErrors')):''}
       ${item('maxpaycalc','💱',t('navMaxPayCalc'))}
+      ${item('margincalc','📊',t('navMarginCalc'))}
     </div>
     ${isAdmin?`
     <div class="nav-group">
@@ -1629,6 +1666,7 @@ function renderView(){
     case 'favorites': return renderFavorites();
     case 'history': return renderHistory(false);
     case 'maxpaycalc': return renderMaxPayCalc();
+    case 'margincalc': return renderMarginCalc();
     case 'qualityerrors': return state.session.role==='admin'
         ? (state.editingErrorId!==null?renderErrorForm():renderErrorsAdmin())
         : renderErrorsAgent();
@@ -1865,6 +1903,339 @@ function mpcSetMode(mode){
   if(mpc.last==='usd' && mpcNum(mpc.usd)!==null) mpcUpdate('usd');
   else if(mpc.last==='iqd' && mpcNum(mpc.iqd)!==null) mpcUpdate('iqd');
   else mpcPaint();
+}
+
+/* ================= MARGIN & MAX LOT CALCULATOR =================
+   margin (in the pair's own currency) = price x contract size x lots / leverage
+   Contract sizes and per-tier leverages come straight from the company's
+   two sheets (maxifyfx_contret_size / maxifyfx_leverage) - nothing guessed.
+   MGC_DATA format: SYMBOL:[contract, quote, category, lev 1:100, lev 1:200, lev 1:300]
+   (null = not in the sheet). Quote currency = last 3 letters of the symbol.
+   State lives in `mgc` so a background re-render can't wipe what was typed. */
+const MGC_ORDER = ["Major forex pairs", "Cross forex pairs", "Exotic forex pairs", "Metals: Gold", "Metals: Silver", "Metals: Others", "Cash Indices: US indices", "Cash Indices: Europe region", "Cash Indices: Asia-Pacific region", "Major Cryptocurrencies", "NDFs as CFD (Non-Deliverable Forwards)", "Commodities"];
+const MGC_DATA = {
+  ASXAUD:[10,"AUD","Cash Indices: Asia-Pacific region",50,50,50],
+  AUDCAD:[100000,"CAD","Cross forex pairs",100,200,300],
+  AUDCHF:[100000,"CHF","Cross forex pairs",100,200,300],
+  AUDDKK:[100000,"DKK","Exotic forex pairs",100,100,100],
+  AUDHUF:[100000,"HUF","Exotic forex pairs",100,100,100],
+  AUDJPY:[100000,"JPY","Cross forex pairs",100,200,300],
+  AUDNOK:[100000,"NOK","Exotic forex pairs",100,100,100],
+  AUDNZD:[100000,"NZD","Cross forex pairs",100,200,300],
+  AUDSEK:[100000,"SEK","Exotic forex pairs",100,100,100],
+  AUDSGD:[100000,"SGD","Exotic forex pairs",100,100,100],
+  AUDUSD:[100000,"USD","Major forex pairs",null,200,300],
+  AUDZAR:[100000,"ZAR","Exotic forex pairs",100,100,100],
+  BRNUSD:[1000,"USD","Commodities",200,200,200],
+  BTCUSD:[1,"USD","Major Cryptocurrencies",10,10,10],
+  CADCHF:[100000,"CHF","Exotic forex pairs",50,50,50],
+  CADDKK:[100000,"DKK","Exotic forex pairs",100,100,100],
+  CADJPY:[100000,"JPY","Exotic forex pairs",100,100,100],
+  CADMXN:[100000,"MXN","Exotic forex pairs",100,100,100],
+  CADNOK:[100000,"NOK","Exotic forex pairs",100,100,100],
+  CADSEK:[100000,"SEK","Exotic forex pairs",100,100,100],
+  CADSGD:[100000,"SGD","Exotic forex pairs",100,100,100],
+  CHFDKK:[100000,"DKK","Exotic forex pairs",50,50,50],
+  CHFHUF:[100000,"HUF","Exotic forex pairs",50,50,50],
+  CHFJPY:[100000,"JPY","Cross forex pairs",100,200,300],
+  CHFNOK:[100000,"NOK","Exotic forex pairs",50,50,50],
+  CHFPLN:[100000,"PLN","Exotic forex pairs",50,50,50],
+  CHFSEK:[100000,"SEK","Exotic forex pairs",50,50,50],
+  CHFSGD:[100000,"SGD","Exotic forex pairs",50,50,50],
+  CHFZAR:[100000,"ZAR","Exotic forex pairs",50,50,50],
+  CNHJPY:[100000,"JPY","Exotic forex pairs",100,100,100],
+  CNXHKD:[10,"HKD","Cash Indices: Asia-Pacific region",13.3333333333333,13.3333333333333,13.3333333333333],
+  CUCUSD:[25000,"USD","Metals: Others",25,25,25],
+  DAXEUR:[null,"EUR","Cash Indices: Europe region",50,50,50],
+  DJIUSD:[10,"USD","Cash Indices: US indices",100,200,200],
+  DKKNOK:[100000,"NOK","Exotic forex pairs",100,100,100],
+  DKKSEK:[100000,"SEK","Exotic forex pairs",100,100,100],
+  ESXEUR:[10,"EUR","Cash Indices: Europe region",50,50,50],
+  ETHUSD:[1,"USD","Major Cryptocurrencies",10,10,10],
+  EURAUD:[100000,"AUD","Cross forex pairs",100,200,300],
+  EURCAD:[100000,"CAD","Cross forex pairs",100,200,300],
+  EURCHF:[100000,"CHF","Cross forex pairs",100,200,300],
+  EURCNH:[100000,"CNH","Exotic forex pairs",100,100,100],
+  EURCZK:[100000,"CZK","Exotic forex pairs",100,100,100],
+  EURDKK:[100000,"DKK","Exotic forex pairs",100,100,100],
+  EURGBP:[100000,"GBP","Cross forex pairs",100,200,300],
+  EURHKD:[100000,"HKD","Exotic forex pairs",100,100,100],
+  EURHUF:[100000,"HUF","Exotic forex pairs",100,100,100],
+  EURILS:[100000,"ILS","Exotic forex pairs",100,100,100],
+  EURJPY:[100000,"JPY","Cross forex pairs",100,200,300],
+  EURMXN:[100000,"MXN","Exotic forex pairs",100,100,100],
+  EURNOK:[100000,"NOK","Exotic forex pairs",100,100,100],
+  EURNZD:[100000,"NZD","Cross forex pairs",100,200,300],
+  EURPLN:[100000,"PLN","Exotic forex pairs",100,100,100],
+  EURSEK:[100000,"SEK","Exotic forex pairs",100,100,100],
+  EURSGD:[100000,"SGD","Exotic forex pairs",100,100,100],
+  EURTRY:[100000,"TRY","Exotic forex pairs",5,5,5],
+  EURUSD:[100000,"USD","Major forex pairs",100,200,300],
+  EURZAR:[100000,"ZAR","Exotic forex pairs",100,100,100],
+  F40EUR:[10,"EUR","Cash Indices: Europe region",50,50,50],
+  FTSGBP:[10,"GBP","Cash Indices: Europe region",50,50,50],
+  GBPAUD:[100000,"AUD","Cross forex pairs",100,200,300],
+  GBPCAD:[100000,"CAD","Cross forex pairs",100,200,300],
+  GBPCHF:[100000,"CHF","Cross forex pairs",100,200,300],
+  GBPCZK:[100000,"CZK","Exotic forex pairs",100,100,100],
+  GBPDKK:[100000,"DKK","Exotic forex pairs",100,100,100],
+  GBPHKD:[100000,"HKD","Exotic forex pairs",100,100,100],
+  GBPHUF:[100000,"HUF","Exotic forex pairs",100,100,100],
+  GBPJPY:[100000,"JPY","Cross forex pairs",100,200,300],
+  GBPMXN:[100000,"MXN","Exotic forex pairs",100,100,100],
+  GBPNOK:[100000,"NOK","Exotic forex pairs",100,100,100],
+  GBPNZD:[100000,"NZD","Cross forex pairs",100,200,300],
+  GBPPLN:[100000,"PLN","Exotic forex pairs",100,100,100],
+  GBPSEK:[100000,"SEK","Exotic forex pairs",100,100,100],
+  GBPSGD:[100000,"SGD","Exotic forex pairs",100,100,100],
+  GBPTRY:[100000,"TRY","Exotic forex pairs",5,5,5],
+  GBPUSD:[100000,"USD","Major forex pairs",100,200,300],
+  GBPZAR:[100000,"ZAR","Exotic forex pairs",100,100,100],
+  HKDJPY:[100000,"JPY","Exotic forex pairs",100,100,100],
+  HSIHKD:[10,"HKD","Cash Indices: Asia-Pacific region",50,50,50],
+  IBXEUR:[10,"EUR","Cash Indices: Europe region",50,50,50],
+  MXNJPY:[100000,"JPY","Exotic forex pairs",20,20,20],
+  NDXUSD:[10,"USD","Cash Indices: US indices",100,200,200],
+  NGCUSD:[10000,"USD","Commodities",100,100,100],
+  NIKJPY:[100,"JPY","Cash Indices: Asia-Pacific region",50,50,50],
+  NOKJPY:[100000,"JPY","Exotic forex pairs",100,100,100],
+  NOKSEK:[100000,"SEK","Exotic forex pairs",100,100,100],
+  NZDCAD:[100000,"CAD","Cross forex pairs",100,200,300],
+  NZDCHF:[100000,"CHF","Cross forex pairs",100,200,300],
+  NZDDKK:[100000,"DKK","Exotic forex pairs",100,100,100],
+  NZDHUF:[100000,"HUF","Exotic forex pairs",100,100,100],
+  NZDJPY:[100000,"JPY","Cross forex pairs",100,200,300],
+  NZDNOK:[100000,"NOK","Exotic forex pairs",100,100,100],
+  NZDSEK:[100000,"SEK","Exotic forex pairs",100,100,100],
+  NZDSGD:[100000,"SGD","Exotic forex pairs",100,100,100],
+  NZDUSD:[100000,"USD","Major forex pairs",100,200,300],
+  S30SGD:[10,"SGD","Cash Indices: Asia-Pacific region",50,50,50],
+  SEKJPY:[100000,"JPY","Exotic forex pairs",100,100,100],
+  SGDHKD:[100000,"HKD","Exotic forex pairs",100,100,100],
+  SGDJPY:[100000,"JPY","Exotic forex pairs",100,100,100],
+  SPXUSD:[10,"USD","Cash Indices: US indices",50,50,50],
+  TRYJPY:[100000,"JPY","Exotic forex pairs",5,5,5],
+  USDBRL:[100000,"BRL","NDFs as CFD (Non-Deliverable Forwards)",16.6666666666667,16.6666666666667,16.6666666666667],
+  USDCAD:[100000,"CAD","Major forex pairs",100,200,300],
+  USDCHF:[100000,"CHF","Major forex pairs",100,200,300],
+  USDCLP:[100000,"CLP","NDFs as CFD (Non-Deliverable Forwards)",10,10,10],
+  USDCNH:[100000,"CNH","Exotic forex pairs",100,100,100],
+  USDCOP:[100000,"COP","NDFs as CFD (Non-Deliverable Forwards)",20,20,20],
+  USDCZK:[100000,"CZK","Exotic forex pairs",100,100,100],
+  USDDKK:[100000,"DKK","Exotic forex pairs",100,100,100],
+  USDHKD:[100000,"HKD","Exotic forex pairs",100,100,100],
+  USDHUF:[100000,"HUF","Exotic forex pairs",100,100,100],
+  USDIDR:[100000,"IDR","NDFs as CFD (Non-Deliverable Forwards)",16.6666666666667,16.6666666666667,16.6666666666667],
+  USDILS:[100000,"ILS","Exotic forex pairs",100,100,100],
+  USDINR:[100000,"INR","NDFs as CFD (Non-Deliverable Forwards)",33.3333333333333,33.3333333333333,33.3333333333333],
+  USDJPY:[100000,"JPY","Major forex pairs",100,200,300],
+  USDKRW:[100000,"KRW","NDFs as CFD (Non-Deliverable Forwards)",33.3333333333333,33.3333333333333,33.3333333333333],
+  USDMXN:[100000,"MXN","Exotic forex pairs",100,100,100],
+  USDNOK:[100000,"NOK","Exotic forex pairs",100,100,100],
+  USDPLN:[100000,"PLN","Exotic forex pairs",100,100,100],
+  USDSEK:[100000,"SEK","Exotic forex pairs",100,100,100],
+  USDSGD:[100000,"SGD","Exotic forex pairs",100,100,100],
+  USDTHB:[100000,"THB","Exotic forex pairs",100,100,100],
+  USDTRY:[100000,"TRY","Exotic forex pairs",5,5,5],
+  USDTWD:[100000,"TWD","NDFs as CFD (Non-Deliverable Forwards)",20,20,20],
+  USDZAR:[100000,"ZAR","Exotic forex pairs",100,100,100],
+  WTIUSD:[1000,"USD","Commodities",200,200,200],
+  XAGAUD:[5000,"AUD","Metals: Silver",100,100,100],
+  XAGCHF:[5000,"CHF","Metals: Silver",100,100,100],
+  XAGEUR:[5000,"EUR","Metals: Silver",100,100,100],
+  XAGGBP:[5000,"GBP","Metals: Silver",100,100,100],
+  XAGUSD:[5000,"USD","Metals: Silver",100,200,200],
+  XAUAUD:[100,"AUD","Metals: Gold",100,200,200],
+  XAUCHF:[100,"CHF","Metals: Gold",100,200,200],
+  XAUEUR:[100,"EUR","Metals: Gold",100,200,200],
+  XAUGBP:[100,"GBP","Metals: Gold",100,200,200],
+  XAUUSD:[100,"USD","Metals: Gold",100,200,200],
+  XINUSD:[10,"USD","Cash Indices: Asia-Pacific region",50,50,50],
+  XPDUSD:[100,"USD","Metals: Others",20,20,20],
+  XPTUSD:[100,"USD","Metals: Others",20,20,20],
+  ZARJPY:[100000,"JPY","Exotic forex pairs",20,20,null]
+};
+
+const MGC_USD_PER_UNIT = { EUR:1, GBP:1, AUD:1, NZD:1 };   // quoted as XXXUSD; every other currency is quoted USDXXX
+const MGC_MIN_LOT = 0.01;
+const mgc = { tab:'margin', search:'', symbol:'EURUSD', tier:'100', lots:'0.01', price:'', lev:'', levExact:null, conv:'', balance:'' };
+
+function mgcNum(v){ const n=parseFloat(v); return (isNaN(n)||n<=0)?null:n; }
+function mgcInfo(sym){
+  const d=MGC_DATA[sym]; if(!d) return null;
+  const quote=d[1], baseIsUsd=sym.indexOf('USD')===0;
+  return { contract:d[0], quote, cat:d[2], levs:{'100':d[3],'200':d[4],'300':d[5]},
+           baseIsUsd, needConv:(quote!=='USD' && !baseIsUsd), perUnit:!!MGC_USD_PER_UNIT[quote] };
+}
+function mgcShortNum(n){ return String(parseFloat(Number(n).toFixed(4))); }
+/* The leverage is ALWAYS taken from the sheet and is read-only — nobody can
+   override it. If the sheet has no value for this symbol/tier, nothing is
+   calculated (we never guess a leverage). */
+function mgcAutoLev(){
+  const info=mgcInfo(mgc.symbol);
+  const v = info ? info.levs[mgc.tier] : null;
+  mgc.levExact = (v===null||v===undefined) ? null : v;
+  mgc.lev = mgc.levExact===null ? '' : mgcShortNum(mgc.levExact);
+}
+mgcAutoLev();
+function mgcOptionsHtml(){
+  const q=mgc.search.trim().toUpperCase(); let html='';
+  MGC_ORDER.forEach(cat=>{
+    const syms=Object.keys(MGC_DATA).filter(x=>MGC_DATA[x][2]===cat && (!q||x.indexOf(q)!==-1)).sort();
+    if(!syms.length) return;
+    html+=`<optgroup label="${esc(cat)}">`+syms.map(x=>`<option value="${x}" ${x===mgc.symbol?'selected':''}>${x}</option>`).join('')+`</optgroup>`;
+  });
+  return html;
+}
+function mgcConvLabels(){
+  const info=mgcInfo(mgc.symbol); if(!info) return {show:false,hint:''};
+  if(info.baseIsUsd && info.quote!=='USD') return {show:false, auto:true, hint:t('mgcConvAuto')};
+  if(!info.needConv) return {show:false, hint:''};
+  const hint=(info.perUnit?t('mgcConvPerUnit'):t('mgcConvPerUsd')).split('{Q}').join(info.quote);
+  return {show:true, hint};
+}
+function mgcLevNoteText(){
+  if(mgc.levExact===null) return `<span style="color:#d64545;">${t('mgcLevMissing')}</span>`;
+  return t('mgcLevSheet');
+}
+function renderMarginCalc(){
+  const tierOpts=['100','200','300'].map(x=>`<option value="${x}" ${x===mgc.tier?'selected':''}>1:${x}</option>`).join('');
+  const cl=mgcConvLabels(), isM=mgc.tab==='margin';
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('mgcTitle')}</h1><p class="page-sub">${t('mgcSub')}</p></div></div>
+    <div class="card card-pad" style="max-width:760px;">
+      <div class="tabbar">
+        <div class="tab ${isM?'active':''}" id="mgcTabMargin" onclick="mgcSetTab('margin')">${t('mgcTabMargin')}</div>
+        <div class="tab ${!isM?'active':''}" id="mgcTabMax" onclick="mgcSetTab('maxlot')">${t('mgcTabMaxLot')}</div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>${t('mgcSearch')}</label>
+          <input id="mgc_search" dir="ltr" value="${esc(mgc.search)}" placeholder="${t('mgcSearchPh')}" oninput="mgcFilter()"></div>
+        <div class="field"><label>${t('mgcSymbol')}</label>
+          <select id="mgc_symbol" onchange="mgcOnSymbol()" style="width:100%;">${mgcOptionsHtml()}</select></div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>${t('mgcTier')}</label>
+          <select id="mgc_tier" onchange="mgcOnTier()" style="width:100%;">${tierOpts}</select></div>
+        <div>
+          <div class="field" id="mgc_lots_wrap" style="display:${isM?'block':'none'};"><label>${t('mgcLots')}</label>
+            <input id="mgc_lots" type="number" inputmode="decimal" min="0.01" step="0.01" dir="ltr" value="${esc(mgc.lots)}" oninput="mgcOnInput()"></div>
+          <div class="field" id="mgc_balance_wrap" style="display:${isM?'none':'block'};"><label>${t('mgcClientBalance')}</label>
+            <input id="mgc_balance" type="number" inputmode="decimal" min="0" step="any" dir="ltr" value="${esc(mgc.balance)}" oninput="mgcOnInput()"></div>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>${t('mgcPrice')}</label>
+          <input id="mgc_price" type="number" inputmode="decimal" min="0" step="any" dir="ltr" value="${esc(mgc.price)}" placeholder="1.08500" oninput="mgcOnInput()"></div>
+        <div class="field"><label>${t('mgcLev')}</label>
+          <input id="mgc_lev" type="text" readonly tabindex="-1" dir="ltr" value="${esc(mgc.lev)}" placeholder="—"
+                 style="background:var(--bg);cursor:not-allowed;opacity:.85;">
+          <div id="mgc_levnote" style="font-size:12px;opacity:.75;margin-top:4px;">${mgcLevNoteText()}</div></div>
+      </div>
+      <div class="field" id="mgc_conv_wrap" style="display:${cl.show?'block':'none'};"><label>${t('mgcConv')}</label>
+        <input id="mgc_conv" type="number" inputmode="decimal" min="0" step="any" dir="ltr" value="${esc(mgc.conv)}" oninput="mgcOnInput()">
+        <div id="mgc_conv_hint" style="font-size:12px;opacity:.75;margin-top:4px;">${esc(cl.hint)}</div></div>
+      <div id="mgc_conv_auto" style="font-size:12px;opacity:.75;margin:-6px 0 12px;display:${cl.auto?'block':'none'};">${cl.auto?esc(cl.hint):''}</div>
+      <div id="mgc_result" class="response-box">${mgcResultHtml()}</div>
+      <p id="mgc_note" style="font-size:12px;opacity:.7;margin-top:10px;display:${isM?'none':'block'};">${t('mgcNote')}</p>
+    </div>`;
+}
+function mgcSyncFields(){
+  const cl=mgcConvLabels(), isM=mgc.tab==='margin';
+  const set=(id,fn)=>{ const el=document.getElementById(id); if(el) fn(el); };
+  set('mgcTabMargin', el=>el.classList.toggle('active', isM));
+  set('mgcTabMax', el=>el.classList.toggle('active', !isM));
+  set('mgc_lots_wrap', el=>{ el.style.display=isM?'block':'none'; });
+  set('mgc_balance_wrap', el=>{ el.style.display=isM?'none':'block'; });
+  set('mgc_note', el=>{ el.style.display=isM?'none':'block'; });
+  set('mgc_lev', el=>{ el.value=mgc.lev; });
+  set('mgc_levnote', el=>{ el.innerHTML=mgcLevNoteText(); });
+  set('mgc_conv_wrap', el=>{ el.style.display=cl.show?'block':'none'; });
+  set('mgc_conv_hint', el=>{ el.textContent=cl.hint||''; });
+  set('mgc_conv_auto', el=>{ el.style.display=cl.auto?'block':'none'; el.textContent=cl.auto?cl.hint:''; });
+  set('mgc_conv', el=>{ el.value=mgc.conv; });
+}
+function mgcCalc(){
+  const info=mgcInfo(mgc.symbol); if(!info) return {err:'nomatch'};
+  if(info.contract===null) return {err:'nocontract', info};
+  const out={info, notes:[]};
+  const price=mgcNum(mgc.price), lev=mgc.levExact;
+  out.lev=lev;
+  if(lev===null){ out.notes.push('mgcLevMissing'); return out; }
+  if(price===null){ out.notes.push('mgcNeedPrice'); return out; }
+  const perLotQuote = price*info.contract/lev;
+  out.perLotQuote=perLotQuote;
+  let perLotUsd=null;
+  if(info.quote==='USD') perLotUsd=perLotQuote;
+  else if(info.baseIsUsd) perLotUsd=perLotQuote/price;                 // USDXXX: the pair's own price is the XXX-per-USD rate
+  else { const rate=mgcNum(mgc.conv);
+         if(rate===null) out.notes.push('mgcNeedConv');
+         else perLotUsd = info.perUnit ? perLotQuote*rate : perLotQuote/rate; }
+  out.perLotUsd=perLotUsd;
+  if(mgc.tab==='margin'){
+    const lots=mgcNum(mgc.lots);
+    if(lots===null || lots<MGC_MIN_LOT-1e-9) out.notes.push('mgcBadLots');
+    else { out.lots=lots; out.totalQuote=perLotQuote*lots; if(perLotUsd!==null) out.totalUsd=perLotUsd*lots; }
+  } else {
+    const bal=mgcNum(mgc.balance);
+    if(bal===null) out.notes.push('mgcNeedBalance');
+    else if(perLotUsd!==null && perLotUsd>0){ out.balance=bal; out.maxLot=Math.floor(bal/perLotUsd*100+1e-9)/100; }
+  }
+  return out;
+}
+function mgcResultHtml(){
+  const r=mgcCalc();
+  if(r.err==='nomatch') return `<p style="opacity:.75;">${t('mgcNoMatch')}</p>`;
+  if(r.err==='nocontract') return `<p style="color:#d64545;">⚠ ${t('mgcNoContract')}</p>`;
+  const info=r.info, Q=info.quote;
+  const row=(label,val)=>`<div>${label}: <b>${val}</b></div>`;
+  let h=`<div style="font-size:14px;line-height:2;">`;
+  h+=row(t('mgcFacts'), mpcFmt(info.contract));
+  h+=row(t('mgcQuote'), esc(Q));
+  if(r.lev!==null && r.lev!==undefined) h+=row(t('mgcLevUsed'), '1:'+mgcShortNum(r.lev));
+  if(r.perLotQuote!==undefined){
+    h+=`<hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">`;
+    if(Q!=='USD') h+=row(t('mgcPerLot')+' ('+t('mgcInQuote').split('{Q}').join(Q)+')', mpcFmt(r.perLotQuote)+' '+Q);
+    if(r.perLotUsd!==null) h+=row(t('mgcPerLot')+' ('+t('mgcInUsd')+')', mpcFmt(r.perLotUsd)+' $');
+    if(mgc.tab==='margin' && r.totalQuote!==undefined){
+      const tl=t('mgcTotal').split('{L}').join(mgcShortNum(r.lots));
+      if(Q!=='USD') h+=row(tl+' ('+t('mgcInQuote').split('{Q}').join(Q)+')', mpcFmt(r.totalQuote)+' '+Q);
+      if(r.totalUsd!==undefined) h+=`<div style="font-size:16px;">${tl} (${t('mgcInUsd')}): <b style="color:var(--primary);">${mpcFmt(r.totalUsd)} $</b></div>`;
+    }
+    if(mgc.tab==='maxlot' && r.maxLot!==undefined){
+      if(r.maxLot<MGC_MIN_LOT-1e-9) h+=`<div style="color:#d64545;">${t('mgcTooLow')} (${t('mgcMinNeeded')}: ${mpcFmt(r.perLotUsd*MGC_MIN_LOT)} $)</div>`;
+      else h+=`<div style="font-size:16px;">${t('mgcMaxLot')}: <b style="color:var(--primary);">${mgcShortNum(r.maxLot)}</b></div>`;
+    }
+  }
+  (r.notes||[]).forEach(k=>{ h+=`<div style="opacity:.8;">- ${t(k)}</div>`; });
+  return h+`</div>`;
+}
+function mgcPaint(){ const el=document.getElementById('mgc_result'); if(el) el.innerHTML=mgcResultHtml(); }
+function mgcReadInputs(){
+  const g=(id,keep)=>{ const el=document.getElementById(id); return el?el.value:keep; };
+  mgc.lots=g('mgc_lots',mgc.lots); mgc.price=g('mgc_price',mgc.price); mgc.conv=g('mgc_conv',mgc.conv); mgc.balance=g('mgc_balance',mgc.balance);
+}
+function mgcOnInput(){ mgcReadInputs(); mgcPaint(); }
+function mgcSetTab(tab){ mgcReadInputs(); mgc.tab=tab; mgcSyncFields(); mgcPaint(); }
+function mgcOnSymbol(){
+  const sel=document.getElementById('mgc_symbol'); if(!sel||!sel.value) return;
+  const oldQ=(mgcInfo(mgc.symbol)||{}).quote;
+  mgc.symbol=sel.value;
+  const newQ=(mgcInfo(mgc.symbol)||{}).quote;
+  mgcReadInputs();
+  if(newQ!==oldQ) mgc.conv='';          // a different currency needs a different rate
+  mgcAutoLev(); mgcSyncFields(); mgcPaint();
+}
+function mgcOnTier(){
+  mgc.tier=document.getElementById('mgc_tier').value;
+  mgcReadInputs(); mgcAutoLev(); mgcSyncFields(); mgcPaint();
+}
+function mgcFilter(){
+  mgc.search=document.getElementById('mgc_search').value;
+  const sel=document.getElementById('mgc_symbol');
+  sel.innerHTML=mgcOptionsHtml();
+  if(!sel.options.length){ const el=document.getElementById('mgc_result'); if(el) el.innerHTML=`<p style="opacity:.75;">${t('mgcNoMatch')}</p>`; return; }
+  if(sel.value!==mgc.symbol) mgcOnSymbol(); else mgcPaint();
 }
 
 function renderResults(){
