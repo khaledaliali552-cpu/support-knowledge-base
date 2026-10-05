@@ -879,6 +879,15 @@ en:{
   appName:"Support Knowledge Base", appSub:"Internal Support Tool",
   workspace:"Workspace", administration:"Administration",
   navSearch:"Search", navFavorites:"Favorites", navHistory:"History",
+  navMaxPayCalc:"MaxPay Calculator",
+  mpcTitle:"MaxPay Calculator (USD ⇄ IQD)", mpcSub:"Work out how many Iraqi dinars the client pays for a deposit or receives for a withdrawal — and the other way round.",
+  mpcDeposit:"Deposit", mpcWithdraw:"Withdrawal",
+  mpcUsd:"Amount in dollars ($)", mpcIqd:"Amount in Iraqi dinars (IQD)",
+  mpcHint:"Type in either box — the other one updates automatically.",
+  mpcSumDeposit:"Client pays", mpcSumWithdraw:"Client receives",
+  mpcRowBase:"Amount at the fixed rate (1,500 IQD per $1)", mpcRowComm:"MaxPay commission (10 IQD per $1)",
+  mpcRowTotalDep:"Total to pay", mpcRowTotalWd:"Net amount received",
+  mpcEffective:"Effective rate", mpcPer:"IQD per $1", mpcEmpty:"Enter an amount to see the result.",
   back:"Back",
   navDashboard:"Dashboard", navKnowledge:"Knowledge Base", navQuality:"Quality", navUsers:"Users",
   navCategories:"Categories", navTeams:"Teams", navSearchHistory:"Search History",
@@ -1051,6 +1060,15 @@ ar:{
   appName:"قاعدة معرفة الدعم", appSub:"أداة الدعم الداخلية",
   workspace:"مساحة العمل", administration:"الإدارة",
   navSearch:"البحث", navFavorites:"المفضلة", navHistory:"السجل",
+  navMaxPayCalc:"حاسبة MaxPay",
+  mpcTitle:"حاسبة MaxPay (دولار ⇄ دينار)", mpcSub:"احسب كم دينار عراقي يدفعها العميل عند الإيداع أو يستلمها عند السحب، والعكس.",
+  mpcDeposit:"إيداع", mpcWithdraw:"سحب",
+  mpcUsd:"المبلغ بالدولار ($)", mpcIqd:"المبلغ بالدينار العراقي (IQD)",
+  mpcHint:"اكتب في أي خانة — والخانة التانية بتتحدث لوحدها.",
+  mpcSumDeposit:"المبلغ اللي يدفعه العميل", mpcSumWithdraw:"المبلغ اللي يستلمه العميل",
+  mpcRowBase:"المبلغ بسعر الصرف الثابت (1,500 دينار لكل 1$)", mpcRowComm:"عمولة MaxPay (10 دينار لكل 1$)",
+  mpcRowTotalDep:"إجمالي المطلوب دفعه", mpcRowTotalWd:"صافي المبلغ المستلم",
+  mpcEffective:"السعر الفعلي", mpcPer:"دينار لكل 1$", mpcEmpty:"اكتب مبلغ عشان تشوف النتيجة.",
   back:"رجوع",
   navDashboard:"لوحة المعلومات", navKnowledge:"قاعدة المعرفة", navQuality:"الجودة", navUsers:"المستخدمون",
   navCategories:"التصنيفات", navTeams:"الفرق", navSearchHistory:"سجل البحث",
@@ -1260,9 +1278,9 @@ function roleLabel(r){ return r==='admin'?t('roleAdmin'):t('roleEmployee'); }
    convenience layer on top of that — they keep the UI honest and give
    instant feedback, but the real boundary is now in the database. */
 const PERMISSIONS = {
-  admin:    ["search","favorites","history","qualityerrors","dashboard","knowledge","quality",
+  admin:    ["search","favorites","history","qualityerrors","maxpaycalc","dashboard","knowledge","quality",
              "users","categories","teams","searchhistory","missing","statistics","settings"],
-  employee: ["search","favorites","history","qualityerrors","knowledge"]
+  employee: ["search","favorites","history","qualityerrors","knowledge","maxpaycalc"]
 };
 const ADMIN_ONLY_ACTIONS = ["knowledge.write","quality.write","qualityerrors.write","users.write",
                             "categories.write","teams.write","types.write","settings.write","missing.write"];
@@ -1573,6 +1591,7 @@ function renderSidebar(){
       ${item('history','🕘',t('navHistory'))}
       ${!isAdmin?item('knowledge','📚',t('navKnowledge')):''}
       ${!isAdmin?item('qualityerrors','⚠',t('navQualityErrors')):''}
+      ${item('maxpaycalc','💱',t('navMaxPayCalc'))}
     </div>
     ${isAdmin?`
     <div class="nav-group">
@@ -1609,6 +1628,7 @@ function renderView(){
     case 'search': return renderSearch();
     case 'favorites': return renderFavorites();
     case 'history': return renderHistory(false);
+    case 'maxpaycalc': return renderMaxPayCalc();
     case 'qualityerrors': return state.session.role==='admin'
         ? (state.editingErrorId!==null?renderErrorForm():renderErrorsAdmin())
         : renderErrorsAgent();
@@ -1765,6 +1785,88 @@ function doSearch(){
   state.lastResults=runSearch(q.trim());
   render();
 }
+/* ===================== MAXPAY CALCULATOR (USD <-> IQD) =====================
+   Fixed MaxPay terms:
+   - Exchange rate: 150,000 IQD per $100  (= 1,500 IQD per $1)
+   - Deposit:    +1,000 IQD commission per $100 -> 151,000 IQD per $100 (1,510 per $1)
+   - Withdrawal: -1,000 IQD commission per $100 -> 149,000 IQD per $100 (1,490 per $1)
+   Values live in `mpc` (not just in the DOM) so a background re-render —
+   e.g. a realtime update pushed by an admin — can't wipe what the agent
+   typed. Inputs update each other directly, without a full render(). */
+const MPC_RATE = { base:1500, deposit:1510, withdraw:1490 };   // IQD per $1
+const mpc = { mode:'deposit', usd:'', iqd:'', last:'usd' };
+
+function mpcRate(){ return mpc.mode==='deposit' ? MPC_RATE.deposit : MPC_RATE.withdraw; }
+function mpcNum(v){ const n=parseFloat(v); return (isNaN(n)||n<0)?null:n; }
+function mpcFmt(n){ return Number(n).toLocaleString('en-US',{maximumFractionDigits:2}); }
+function mpcPlain(n){ return String(Math.round(n*100)/100); }
+
+function mpcValues(){
+  const rate=mpcRate();
+  if(mpc.last==='usd'){ const u=mpcNum(mpc.usd); return u===null?null:{usd:u, iqd:u*rate}; }
+  const d=mpcNum(mpc.iqd); return d===null?null:{usd:d/rate, iqd:d};
+}
+function renderMaxPayCalc(){
+  const isDep = mpc.mode==='deposit';
+  return `<div class="page-head"><div>
+      <h1 class="page-title">${t('mpcTitle')}</h1><p class="page-sub">${t('mpcSub')}</p></div></div>
+    <div class="card card-pad" style="max-width:640px;">
+      <div class="tabbar">
+        <div class="tab ${isDep?'active':''}" id="mpcTabDep" onclick="mpcSetMode('deposit')">${t('mpcDeposit')}</div>
+        <div class="tab ${!isDep?'active':''}" id="mpcTabWd" onclick="mpcSetMode('withdraw')">${t('mpcWithdraw')}</div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>${t('mpcUsd')}</label>
+          <input id="mpc_usd" type="number" inputmode="decimal" min="0" step="any" dir="ltr"
+                 value="${esc(mpc.usd)}" placeholder="100" oninput="mpcUpdate('usd')"></div>
+        <div class="field"><label>${t('mpcIqd')}</label>
+          <input id="mpc_iqd" type="number" inputmode="decimal" min="0" step="any" dir="ltr"
+                 value="${esc(mpc.iqd)}" placeholder="${isDep?'151000':'149000'}" oninput="mpcUpdate('iqd')"></div>
+      </div>
+      <p style="font-size:12.5px;opacity:.7;margin:-4px 0 14px;">${t('mpcHint')}</p>
+      <div id="mpc_summary" class="response-box">${mpcSummaryHtml()}</div>
+    </div>`;
+}
+function mpcSummaryHtml(){
+  const v = mpcValues();
+  const isDep = mpc.mode==='deposit';
+  if(!v) return `<p style="opacity:.7;">${t('mpcEmpty')}</p>`;
+  const base = v.usd*MPC_RATE.base;
+  const comm = v.usd*(MPC_RATE.deposit-MPC_RATE.base);   // 10 IQD per $1
+  return `<div style="font-size:14px;line-height:2;">
+      <div>💵 ${mpcFmt(v.usd)} $</div>
+      <div>${t('mpcRowBase')}: <b>${mpcFmt(base)}</b> IQD</div>
+      <div>${t('mpcRowComm')}: <b>${isDep?'+':'−'}${mpcFmt(comm)}</b> IQD</div>
+      <div style="font-size:16px;margin-top:6px;">${isDep?t('mpcRowTotalDep'):t('mpcRowTotalWd')}:
+        <b style="color:var(--primary);">${mpcFmt(v.iqd)} IQD</b></div>
+      <div style="font-size:12.5px;opacity:.7;">${t('mpcEffective')}: ${mpcFmt(mpcRate())} ${t('mpcPer')}</div>
+    </div>`;
+}
+function mpcPaint(){ const el=document.getElementById('mpc_summary'); if(el) el.innerHTML=mpcSummaryHtml(); }
+function mpcUpdate(src){
+  const uEl=document.getElementById('mpc_usd'), iEl=document.getElementById('mpc_iqd');
+  const rate=mpcRate();
+  mpc.last=src;
+  if(src==='usd'){
+    mpc.usd=uEl.value; const u=mpcNum(mpc.usd);
+    if(u===null){ mpc.iqd=''; iEl.value=''; } else { mpc.iqd=mpcPlain(u*rate); iEl.value=mpc.iqd; }
+  } else {
+    mpc.iqd=iEl.value; const d=mpcNum(mpc.iqd);
+    if(d===null){ mpc.usd=''; uEl.value=''; } else { mpc.usd=mpcPlain(d/rate); uEl.value=mpc.usd; }
+  }
+  mpcPaint();
+}
+function mpcSetMode(mode){
+  mpc.mode=mode;
+  document.getElementById('mpcTabDep').classList.toggle('active', mode==='deposit');
+  document.getElementById('mpcTabWd').classList.toggle('active', mode==='withdraw');
+  document.getElementById('mpc_iqd').placeholder = mode==='deposit'?'151000':'149000';
+  // keep whichever box the agent typed in last, recompute the other one at the new rate
+  if(mpc.last==='usd' && mpcNum(mpc.usd)!==null) mpcUpdate('usd');
+  else if(mpc.last==='iqd' && mpcNum(mpc.iqd)!==null) mpcUpdate('iqd');
+  else mpcPaint();
+}
+
 function renderResults(){
   if(state.lastResults===null) return '';
   const r=state.lastResults;
