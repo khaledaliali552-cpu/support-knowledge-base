@@ -344,6 +344,15 @@
     .search-filters{flex-direction:column;align-items:stretch;}
     .escalation-row b{min-width:100%;}
   }
+
+  .kb-no{width:1%;white-space:nowrap;text-align:center;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+  .pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:12px 16px;border-top:1px solid var(--border);font-size:13px;}
+  .pager .pg-info{opacity:.75;}
+  .pager .pg-btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .pager .pg-gap{opacity:.5;padding:0 2px;}
+  .pager .pg-size{display:flex;align-items:center;gap:8px;opacity:.9;}
+  .pager .pg-size select{width:auto;padding:4px 8px;}
+  .pager .btn[disabled]{opacity:.45;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -375,7 +384,7 @@
    ===================================================================== */
 
 /* ============================== 1. DATA ============================== */
-let categories = ["Deposits","Withdrawals","USDT","MaxPay","Max Fi","Trading","MT5","Verification","IB","Technical Issues","Account","Other"];
+let categories = ["Deposits","Withdrawals","USDT","MaxPay","MaxifyFX","Trading","MT5","Verification","IB","Technical Issues","Account","Other"];
 let teams = ["Technical Support","Financial Department","IB Department","Compliance","Operations"];
 
 // Knowledge types — a knowledge item is NOT necessarily a Q&A.
@@ -597,19 +606,19 @@ let knowledgeItems = [
     }
   },
   {
-    id:"kb5", category:"Max Fi", subcategory:"Platform", type:"trouble",
+    id:"kb5", category:"MaxifyFX", subcategory:"Platform", type:"trouble",
     responsibleTeam:"Technical Support", raiseRequest:true,
     status:"Active", needsClarification:false,
     createdAt:"2026-08-20", updatedAt:"2026-09-11",
     en:{
-      title:"Max Fi Technical Issue",
-      keywords:["max fi","technical","login","error","crash","application","platform"],
+      title:"MaxifyFX Technical Issue",
+      keywords:["MaxifyFX","technical","login","error","crash","application","platform"],
       exampleQuestions:[
-        "The Max Fi app keeps crashing",
-        "The client cannot log in to Max Fi",
+        "The MaxifyFX app keeps crashing",
+        "The client cannot log in to MaxifyFX",
         "An error message appears when opening the application"
       ],
-      explanation:"The client is experiencing a technical problem on the Max Fi platform, such as a login failure, an application crash, or a visible error message.",
+      explanation:"The client is experiencing a technical problem on the MaxifyFX platform, such as a login failure, an application crash, or a visible error message.",
       internalAnswer:"Ask the client for a screenshot of the error, the device and operating system, and the application version. Start with the basic checks: latest application version, stable internet connection, and correct login credentials. If the issue persists, escalate to Technical Support with all collected details.",
       clientResponse:"We are sorry you are experiencing this. Could you please send us a screenshot of the error along with your device type and application version? In the meantime, please make sure the application is updated to the latest version.",
       supportSteps:[
@@ -623,14 +632,14 @@ let knowledgeItems = [
       importantNotes:"Do not attempt to diagnose server-side causes yourself. Collect the details and escalate."
     },
     ar:{
-      title:"مشكلة تقنية في Max Fi",
-      keywords:["ماكس فاي","max fi","مشكلة تقنية","تسجيل الدخول","خطأ","التطبيق","المنصة"],
+      title:"مشكلة تقنية في MaxifyFX",
+      keywords:["MaxifyFX","MaxifyFX","مشكلة تقنية","تسجيل الدخول","خطأ","التطبيق","المنصة"],
       exampleQuestions:[
-        "تطبيق Max Fi يتوقف باستمرار",
-        "العميل لا يستطيع تسجيل الدخول إلى Max Fi",
+        "تطبيق MaxifyFX يتوقف باستمرار",
+        "العميل لا يستطيع تسجيل الدخول إلى MaxifyFX",
         "تظهر رسالة خطأ عند فتح التطبيق"
       ],
-      explanation:"يواجه العميل مشكلة تقنية في منصة Max Fi، مثل تعذّر تسجيل الدخول أو توقف التطبيق أو ظهور رسالة خطأ.",
+      explanation:"يواجه العميل مشكلة تقنية في منصة MaxifyFX، مثل تعذّر تسجيل الدخول أو توقف التطبيق أو ظهور رسالة خطأ.",
       internalAnswer:"اطلب من العميل صورة من رسالة الخطأ، ونوع الجهاز ونظام التشغيل، وإصدار التطبيق. ابدأ بالفحوصات الأساسية: أحدث إصدار من التطبيق، واتصال إنترنت مستقر، وصحة بيانات الدخول. وإذا استمرت المشكلة، قم بالتصعيد إلى الدعم الفني مع كل البيانات التي تم جمعها.",
       clientResponse:"نأسف لما تواجهه. هل يمكنك من فضلك إرسال صورة من رسالة الخطأ مع توضيح نوع جهازك وإصدار التطبيق؟ وفي الوقت نفسه، يرجى التأكد من تحديث التطبيق إلى أحدث إصدار.",
       supportSteps:[
@@ -960,7 +969,7 @@ en:{
   knowledgeTitle:"Knowledge Base",
   knowledgeSub:"The central repository for all support information — procedures, policies, rules and internal notes.",
   knowledgeIntro:"This is the single source of truth for the support team. Any type of information can be stored here — it is not limited to questions and answers. Selected parts of it can then be marked as Quality requirements.",
-  filterItems:"Filter items...", addKnowledge:"Add knowledge item",
+  filterItems:"Search by title, category, or keywords...", kbNo:"#", kbShowing:"Showing {a}–{b} of {n}", kbPrev:"Previous", kbNext:"Next", kbPerPage:"Rows per page", addKnowledge:"Add knowledge item",
   noItems:"No knowledge items found.",
   edit:"Edit", del:"Delete", activate:"Activate", deactivate:"Deactivate",
   addKnowledgeTitle:"Add knowledge item", editKnowledgeTitle:"Edit knowledge item",
@@ -1159,7 +1168,7 @@ ar:{
   knowledgeTitle:"قاعدة المعرفة",
   knowledgeSub:"المرجع المركزي لكل معلومات الدعم — الإجراءات والسياسات والقواعد والملاحظات الداخلية.",
   knowledgeIntro:"هذه هي المرجعية الأساسية لفريق الدعم. يمكن حفظ أي نوع من المعلومات هنا، فهي ليست مقتصرة على الأسئلة والأجوبة. ويمكن بعد ذلك تحديد أجزاء منها كمتطلبات جودة.",
-  filterItems:"تصفية العناصر...", addKnowledge:"إضافة عنصر معرفة",
+  filterItems:"ابحث بالعنوان أو التصنيف أو الكلمات المفتاحية...", kbNo:"#", kbShowing:"عرض {a}–{b} من {n}", kbPrev:"السابق", kbNext:"التالي", kbPerPage:"عدد الصفوف في الصفحة", addKnowledge:"إضافة عنصر معرفة",
   noItems:"لا توجد عناصر معرفة.",
   edit:"تعديل", del:"حذف", activate:"تفعيل", deactivate:"تعطيل",
   addKnowledgeTitle:"إضافة عنصر معرفة", editKnowledgeTitle:"تعديل عنصر المعرفة",
@@ -1658,6 +1667,7 @@ function goTo(v){
   state.view=v; state.editingItemId=null; state.editingRuleId=null;
   state.editingUserId=null; state.editingErrorId=null; state.errorFilter="";
   state.viewingKbId=null;
+  if(v==='knowledge'){ kbView.q=''; kbView.page=1; }
   closeSidebarMobile(); render();
 }
 function renderView(){
@@ -1791,8 +1801,8 @@ function renderSearch(){
   const statusOpts=[['Active',t('active')],['Inactive',t('inactive')],['All',t('all')]].map(([v,l])=>
     `<option value="${v}" ${state.filterStatus===v?'selected':''}>${l}</option>`).join('');
   const quick = state.lang==='ar'
-    ? ["إيداع USDT","السحب قيد المراجعة","توثيق الحساب","MaxPay","Max Fi"]
-    : ["USDT deposit","Withdrawal under review","Verification","MaxPay","Max Fi"];
+    ? ["إيداع USDT","السحب قيد المراجعة","توثيق الحساب","MaxPay","MaxifyFX"]
+    : ["USDT deposit","Withdrawal under review","Verification","MaxPay","MaxifyFX"];
   return `
     <div class="hero">
       <h1>${t('heroTitle')}</h1>
@@ -2471,36 +2481,117 @@ function renderKnowledgeList(){
     const item = findItem(state.viewingKbId);
     if(!item) { state.viewingKbId=null; }
     else return `<div class="page-head"><div>
-        <button class="btn btn-ghost btn-sm" onclick="const _id=state.viewingKbId;state.viewingKbId=null;render();scrollToRow('row-kb-'+_id);">← ${t('back')}</button>
+        <button class="btn btn-ghost btn-sm" onclick="const _id=state.viewingKbId;state.viewingKbId=null;kbShowPageOf(_id);render();scrollToRow('row-kb-'+_id);">← ${t('back')}</button>
       </div></div>${renderResultCard(item)}`;
   }
   return `<div class="page-head"><div>
       <h1 class="page-title">${t('knowledgeTitle')}</h1><p class="page-sub">${t('knowledgeSub')}</p></div></div>
     <div class="info-banner">${t('knowledgeIntro')}</div>
     <div class="toolbar">
-      <div class="search-mini"><span>🔍</span><input id="kbFilter" dir="auto" placeholder="${t('filterItems')}" oninput="refreshKb()"></div>
+      <div class="search-mini"><span>🔍</span><input id="kbFilter" dir="auto" placeholder="${t('filterItems')}" value="${esc(kbView.q)}" oninput="refreshKb()"></div>
       ${isAdmin?`<button class="btn btn-primary" onclick="openAddKnowledge()">+ ${t('addKnowledge')}</button>`:''}
     </div>
-    <div class="card" id="kbWrap">${kbRows(knowledgeItems, isAdmin)}</div>`;
+    <div class="card" id="kbWrap">${kbPageHtml()}</div>`;
 }
-function refreshKb(){
-  const q=normalize(document.getElementById('kbFilter').value);
-  const rows=knowledgeItems.filter(it=>!q||normalize(C(it,'title')).includes(q)||
-    normalize((it.en&&it.en.title)||"").includes(q)||normalize((it.ar&&it.ar.title)||"").includes(q)||
-    normalize(it.category).includes(q));
-  document.getElementById('kbWrap').innerHTML=kbRows(rows, state.session.role==='admin');
+
+/* ---------- knowledge-base list: search + row numbers + paging ----------
+   The search box looks in: the title (Arabic + English), the category (English
+   name AND its Arabic name), the sub-category, and the keywords. Several words
+   can be typed — every word must be found. The answers' text is NOT searched.
+   Search text, page and page size live in kbView so a background re-render
+   (e.g. a realtime update) doesn't throw the user back to page 1. */
+const kbView = { q:'', page:1, size:25 };
+const KB_PAGE_SIZES = [25,50,100];
+const KB_CAT_AR = {
+  "Deposits":["الإيداع","ايداع","إيداع","الإيداعات"],
+  "Withdrawals":["السحب","سحب","السحوبات"],
+  "USDT":["تيثر"],
+  "MaxPay":["ماكس باي","ماكسباي"],
+  "Trading":["التداول","تداول"],
+  "MT5":["ميتاتريدر"],
+  "Leverage":["الرافعة","الرافعة المالية","رافعة"],
+  "Verification":["التوثيق","توثيق","التحقق"],
+  "IB":["الوكالة","وكالة","الوكلاء","وكيل","الشراكة"],
+  "Technical Issues":["مشاكل تقنية","مشكلة تقنية","المشاكل التقنية"],
+  "Account":["الحساب","حساب","الحسابات"],
+  "Other":["أخرى","اخرى","متفرقات"],
+  "MaxifyFX":["ماكس فاي","ماكسفاي","الشركة","عن الشركة"],
+  "MaxCoin":["ماكس كوين","ماكسكوين","العروض","عروض"],
+  "General Information":["معلومات عامة"],
+  "Bonus":["بونص","البونص","مكافأة"],
+  "Competitions":["مسابقة","مسابقات","المسابقات","فانتازي"],
+  "Compliance":["الامتثال","امتثال"]
+};
+function kbHaystack(it){
+  const kw=x=>Array.isArray(x)?x.join(' '):String(x||'');
+  return normalize([
+    (it.en&&it.en.title)||'', (it.ar&&it.ar.title)||'',
+    it.category||'', (KB_CAT_AR[it.category]||[]).join(' '),
+    it.subcategory||'',
+    kw(it.en&&it.en.keywords), kw(it.ar&&it.ar.keywords)
+  ].join(' | '));
 }
-function kbRows(rows, isAdmin){
+function kbFiltered(){
+  const words=normalize(kbView.q).split(' ').filter(Boolean);
+  if(!words.length) return knowledgeItems;
+  return knowledgeItems.filter(it=>{ const h=kbHaystack(it); return words.every(w=>h.includes(w)); });
+}
+function kbPagesCount(total){ return Math.max(1, Math.ceil(total/kbView.size)); }
+function kbPageHtml(){
+  const isAdmin=state.session.role==='admin';
+  const rows=kbFiltered(), total=rows.length, pages=kbPagesCount(total);
+  if(kbView.page>pages) kbView.page=pages;
+  if(kbView.page<1) kbView.page=1;
+  const start=(kbView.page-1)*kbView.size, slice=rows.slice(start,start+kbView.size);
+  return kbRows(slice,isAdmin,start)+(total?kbPagerHtml(total,start,slice.length,pages):'');
+}
+function kbPagerHtml(total,start,count,pages){
+  const cur=kbView.page, set=new Set([1,pages,cur-1,cur,cur+1]);
+  if(cur<=3) [2,3,4].forEach(n=>set.add(n));
+  if(cur>=pages-2) [pages-1,pages-2,pages-3].forEach(n=>set.add(n));
+  const nums=[...set].filter(n=>n>=1&&n<=pages).sort((x,y)=>x-y);
+  let btns='', prev=0;
+  nums.forEach(n=>{
+    if(prev && n-prev>1) btns+=`<span class="pg-gap">…</span>`;
+    btns+=`<button class="btn btn-sm ${n===cur?'btn-primary':'btn-outline'}" onclick="kbGoPage(${n})">${n}</button>`; prev=n;
+  });
+  const info=t('kbShowing').split('{a}').join(start+1).split('{b}').join(start+count).split('{n}').join(total);
+  const sizes=KB_PAGE_SIZES.map(n=>`<option value="${n}" ${n===kbView.size?'selected':''}>${n}</option>`).join('');
+  return `<div class="pager">
+      <div class="pg-info">${info}</div>
+      <div class="pg-btns">
+        <button class="btn btn-outline btn-sm" ${cur<=1?'disabled':''} onclick="kbGoPage(${cur-1})">${t('kbPrev')}</button>
+        ${btns}
+        <button class="btn btn-outline btn-sm" ${cur>=pages?'disabled':''} onclick="kbGoPage(${cur+1})">${t('kbNext')}</button>
+      </div>
+      <div class="pg-size"><span>${t('kbPerPage')}</span> <select onchange="kbSetSize(this.value)">${sizes}</select></div>
+    </div>`;
+}
+function kbRepaint(scrollTop){
+  const w=document.getElementById('kbWrap'); if(!w) return;
+  w.innerHTML=kbPageHtml();
+  if(scrollTop) w.scrollIntoView({block:'start'});
+}
+function refreshKb(){ kbView.q=document.getElementById('kbFilter').value; kbView.page=1; kbRepaint(false); }
+function kbGoPage(n){ kbView.page=n; kbRepaint(true); }
+function kbSetSize(v){ kbView.size=parseInt(v,10)||25; kbView.page=1; kbRepaint(true); }
+// make sure the page that holds this item is the one being shown (used when coming back from an edit form)
+function kbShowPageOf(id){
+  const i=kbFiltered().findIndex(x=>x.id===id);
+  if(i>=0) kbView.page=Math.floor(i/kbView.size)+1;
+}
+function kbRows(rows, isAdmin, startIdx){
   if(isAdmin===undefined) isAdmin = state.session.role==='admin';
   if(!rows.length) return `<div class="empty-state"><div class="icon">📚</div>${t('noItems')}</div>`;
   return `<table><thead><tr>
-      <th>${t('colTitle')}</th><th>${t('colCategory')}</th><th>${t('colType')}</th>
+      <th class="kb-no">${t('kbNo')}</th><th>${t('colTitle')}</th><th>${t('colCategory')}</th><th>${t('colType')}</th>
       <th>${t('navQuality')}</th><th>${t('colStatus')}</th><th>${t('colUpdated')}</th>
       ${isAdmin?`<th>${t('colActions')}</th>`:''}
     </tr></thead><tbody>
-    ${rows.map(it=>{
+    ${rows.map((it,idx)=>{
       const n=qualityRules.filter(q=>q.knowledgeId===it.id).length;
       return `<tr id="row-kb-${esc(it.id)}" ${isAdmin?'':`class="kb-row-clickable" onclick="state.viewingKbId='${it.id}';render();"`}>
+        <td class="kb-no">${(startIdx||0)+idx+1}</td>
         <td dir="auto"><div style="font-weight:600;color:var(--text);">${esc(C(it,'title'))}</div>
           ${it.needsClarification?`<span class="clarify-flag" style="margin-top:4px;display:inline-block;">${t('needsClarificationFlag')}</span>`:''}</td>
         <td>${esc(it.category)}</td>
@@ -2551,7 +2642,7 @@ function scrollToRow(rowId){
 }
 function openEditKnowledge(id){ if(!guard('knowledge.write'))return; state.editingItemId=id; render(); }
 function cancelKb(){
-  const id=state.editingItemId; state.editingItemId=null; render();
+  const id=state.editingItemId; state.editingItemId=null; if(id && id!=='new') kbShowPageOf(id); render();
   if(id && id!=='new') scrollToRow('row-kb-'+id);
 }
 
@@ -2661,6 +2752,7 @@ function readLang(L){
     requiredInformation:lines(g('required')), importantNotes:g('notes').trim()
   };
 }
+let newKbId=null;
 function saveKb(idOrNew){
   if(!guard('knowledge.write')) return;
   const en=readLang('en'), ar=readLang('ar');
@@ -2679,6 +2771,7 @@ function saveKb(idOrNew){
   if(idOrNew==='new'){
     const id=nextId('kb');
     knowledgeItems.push(Object.assign({id,createdAt:todayStr()},payload));
+    kbView.q=''; kbView.page=kbPagesCount(knowledgeItems.length); newKbId=id;   // new items go to the end: show them
     const toQ=document.getElementById('f_toQuality');
     if(toQ&&toQ.checked){
       state.editingItemId=null; state.view='quality'; state.editingRuleId='new';
@@ -2687,9 +2780,10 @@ function saveKb(idOrNew){
     showToast(t('itemAdded'));
   } else {
     Object.assign(findItem(idOrNew),payload); showToast(t('itemUpdated'));
+    kbShowPageOf(idOrNew);
   }
   state.editingItemId=null; render();
-  if(idOrNew!=='new') scrollToRow('row-kb-'+idOrNew);
+  scrollToRow('row-kb-'+(idOrNew==='new'?newKbId:idOrNew));
 }
 
 /* ============================== QUALITY ============================== */
