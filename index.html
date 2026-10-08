@@ -912,7 +912,7 @@ en:{
   mpcUsd:"Amount in dollars ($)", mpcIqd:"Amount in Iraqi dinars (IQD)",
   mpcHint:"Type in either box — the other one updates automatically.",
   mpcSumDeposit:"Client pays", mpcSumWithdraw:"Client receives",
-  mpcRowBase:"Amount at the fixed rate (1,500 IQD per $1)", mpcRowComm:"MaxPay commission (10 IQD per $1)",
+  mpcRowBase:"Amount at the fixed rate ({R} IQD per $1)", mpcRowComm:"MaxPay commission ({C} IQD per $1)",
   mpcRowTotalDep:"Total to pay", mpcRowTotalWd:"Net amount received",
   mpcEffective:"Effective rate", mpcPer:"IQD per $1", mpcEmpty:"Enter an amount to see the result.",
   back:"Back",
@@ -1111,7 +1111,7 @@ ar:{
   mpcUsd:"المبلغ بالدولار ($)", mpcIqd:"المبلغ بالدينار العراقي (IQD)",
   mpcHint:"اكتب في أي خانة — والخانة التانية بتتحدث لوحدها.",
   mpcSumDeposit:"المبلغ اللي يدفعه العميل", mpcSumWithdraw:"المبلغ اللي يستلمه العميل",
-  mpcRowBase:"المبلغ بسعر الصرف الثابت (1,500 دينار لكل 1$)", mpcRowComm:"عمولة MaxPay (10 دينار لكل 1$)",
+  mpcRowBase:"المبلغ بسعر الصرف الثابت ({R} دينار لكل 1$)", mpcRowComm:"عمولة MaxPay ({C} دينار لكل 1$)",
   mpcRowTotalDep:"إجمالي المطلوب دفعه", mpcRowTotalWd:"صافي المبلغ المستلم",
   mpcEffective:"السعر الفعلي", mpcPer:"دينار لكل 1$", mpcEmpty:"اكتب مبلغ عشان تشوف النتيجة.",
   back:"رجوع",
@@ -1834,16 +1834,19 @@ function doSearch(){
   render();
 }
 /* ===================== MAXPAY CALCULATOR (USD <-> IQD) =====================
-   Fixed MaxPay terms:
-   - Exchange rate: 150,000 IQD per $100  (= 1,500 IQD per $1)
-   - Deposit:    +1,000 IQD commission per $100 -> 151,000 IQD per $100 (1,510 per $1)
-   - Withdrawal: -1,000 IQD commission per $100 -> 149,000 IQD per $100 (1,490 per $1)
+   Fixed MaxPay terms (to change the rate later, edit ONLY MPC_RATE below - every
+   label, placeholder and result on the page is built from it):
+   - Exchange rate: 1,650 IQD per $1   (= 165,000 IQD per $100)
+   - Commission:    1,000 IQD per $100 on deposit AND withdrawal (= 10 IQD per $1)
+   - Deposit:    $100 = 166,000 IQD  (1,660 per $1, commission included)
+   - Withdrawal: $100 = 164,000 IQD  (1,640 per $1, after the commission)
    Values live in `mpc` (not just in the DOM) so a background re-render —
    e.g. a realtime update pushed by an admin — can't wipe what the agent
    typed. Inputs update each other directly, without a full render(). */
-const MPC_RATE = { base:1500, deposit:1510, withdraw:1490 };   // IQD per $1
+const MPC_RATE = { base:1650, deposit:1660, withdraw:1640 };   // IQD per $1
 const mpc = { mode:'deposit', usd:'', iqd:'', last:'usd' };
 
+function mpcLbl(k){ return t(k).split('{R}').join(mpcFmt(MPC_RATE.base)).split('{C}').join(mpcFmt(MPC_RATE.deposit-MPC_RATE.base)); }
 function mpcRate(){ return mpc.mode==='deposit' ? MPC_RATE.deposit : MPC_RATE.withdraw; }
 function mpcNum(v){ const n=parseFloat(v); return (isNaN(n)||n<0)?null:n; }
 function mpcFmt(n){ return Number(n).toLocaleString('en-US',{maximumFractionDigits:2}); }
@@ -1869,7 +1872,7 @@ function renderMaxPayCalc(){
                  value="${esc(mpc.usd)}" placeholder="100" oninput="mpcUpdate('usd')"></div>
         <div class="field"><label>${t('mpcIqd')}</label>
           <input id="mpc_iqd" type="number" inputmode="decimal" min="0" step="any" dir="ltr"
-                 value="${esc(mpc.iqd)}" placeholder="${isDep?'151000':'149000'}" oninput="mpcUpdate('iqd')"></div>
+                 value="${esc(mpc.iqd)}" placeholder="${isDep?MPC_RATE.deposit*100:MPC_RATE.withdraw*100}" oninput="mpcUpdate('iqd')"></div>
       </div>
       <p style="font-size:12.5px;opacity:.7;margin:-4px 0 14px;">${t('mpcHint')}</p>
       <div id="mpc_summary" class="response-box">${mpcSummaryHtml()}</div>
@@ -1883,8 +1886,8 @@ function mpcSummaryHtml(){
   const comm = v.usd*(MPC_RATE.deposit-MPC_RATE.base);   // 10 IQD per $1
   return `<div style="font-size:14px;line-height:2;">
       <div>💵 ${mpcFmt(v.usd)} $</div>
-      <div>${t('mpcRowBase')}: <b>${mpcFmt(base)}</b> IQD</div>
-      <div>${t('mpcRowComm')}: <b>${isDep?'+':'−'}${mpcFmt(comm)}</b> IQD</div>
+      <div>${mpcLbl('mpcRowBase')}: <b>${mpcFmt(base)}</b> IQD</div>
+      <div>${mpcLbl('mpcRowComm')}: <b>${isDep?'+':'−'}${mpcFmt(comm)}</b> IQD</div>
       <div style="font-size:16px;margin-top:6px;">${isDep?t('mpcRowTotalDep'):t('mpcRowTotalWd')}:
         <b style="color:var(--primary);">${mpcFmt(v.iqd)} IQD</b></div>
       <div style="font-size:12.5px;opacity:.7;">${t('mpcEffective')}: ${mpcFmt(mpcRate())} ${t('mpcPer')}</div>
@@ -1908,7 +1911,7 @@ function mpcSetMode(mode){
   mpc.mode=mode;
   document.getElementById('mpcTabDep').classList.toggle('active', mode==='deposit');
   document.getElementById('mpcTabWd').classList.toggle('active', mode==='withdraw');
-  document.getElementById('mpc_iqd').placeholder = mode==='deposit'?'151000':'149000';
+  document.getElementById('mpc_iqd').placeholder = String(mode==='deposit'?MPC_RATE.deposit*100:MPC_RATE.withdraw*100);
   // keep whichever box the agent typed in last, recompute the other one at the new rate
   if(mpc.last==='usd' && mpcNum(mpc.usd)!==null) mpcUpdate('usd');
   else if(mpc.last==='iqd' && mpcNum(mpc.iqd)!==null) mpcUpdate('iqd');
