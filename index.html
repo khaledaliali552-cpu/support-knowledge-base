@@ -1503,8 +1503,17 @@ async function fetchProfiles(){
 }
 function toggleSidebar(){ document.querySelector('.sidebar')?.classList.toggle('open'); }
 function closeSidebarMobile(){ document.querySelector('.sidebar')?.classList.remove('open'); }
+/* ---- What survives a page refresh --------------------------------------
+   - the language the user picked  -> localStorage   (a per-device preference, kept until they change it)
+   - the section they are on       -> sessionStorage (per browser tab; forgotten when the tab is closed
+                                                      or when they log out)
+   Both are wrapped in try/catch: if the browser blocks storage the app simply behaves as before. */
+function prefGet(store,key){ try{ return window[store].getItem(key); }catch(e){ return null; } }
+function prefSet(store,key,val){ try{ window[store].setItem(key,val); }catch(e){} }
+function prefDel(store,key){ try{ window[store].removeItem(key); }catch(e){} }
+function savedLang(){ const l=prefGet('localStorage','kb_lang'); return (l==='ar'||l==='en')?l:null; }
 function setLang(l){
-  state.lang=l;
+  state.lang=l; prefSet('localStorage','kb_lang',l);
   const r=document.getElementById('htmlRoot');
   r.setAttribute('lang',l); r.setAttribute('dir', l==='ar'?'rtl':'ltr');
   render();
@@ -1664,7 +1673,8 @@ function renderSidebar(){
 }
 function goTo(v){
   if(!can(v)){ showToast(t('accessDenied')); return; }
-  state.view=v; state.editingItemId=null; state.editingRuleId=null;
+  state.view=v; prefSet('sessionStorage','kb_view',v);
+  state.editingItemId=null; state.editingRuleId=null;
   state.editingUserId=null; state.editingErrorId=null; state.errorFilter="";
   state.viewingKbId=null;
   if(v==='knowledge'){ kbView.q=''; kbView.page=1; }
@@ -1787,7 +1797,7 @@ async function doLogin(){
 }
 function logout(){
   if(db){ db.auth.signOut(); if(kbChannel) db.removeChannel(kbChannel); kbChannel=null; }
-  state.session=null; state.view='login'; state.lastResults=null;
+  state.session=null; state.view='login'; state.lastResults=null; prefDel('sessionStorage','kb_view');
   searchHistory=[]; favoritesByUser={}; users=[];
   render();
 }
@@ -3390,6 +3400,7 @@ async function fetchKbData(){
 
 (async function init(){
   const r=document.getElementById('htmlRoot');
+  if(savedLang()) state.lang=savedLang();
   r.setAttribute('lang',state.lang);
   r.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
 
@@ -3406,6 +3417,8 @@ async function fetchKbData(){
         if(profile && profile.status==='Active'){
           state.session={userId:profile.id, name:profile.name, username:profile.username, role:profile.role};
           state.view=defaultViewFor(profile.role);
+          const sv=prefGet('sessionStorage','kb_view');          // stay on the section they were on
+          if(sv && sv!=='login' && can(sv)) state.view=sv;
           await Promise.all([
             fetchMyFavorites(), fetchMyHistory(), fetchKbData(),
             profile.role==='admin' ? fetchProfiles() : Promise.resolve()
@@ -3417,7 +3430,7 @@ async function fetchKbData(){
     }catch(e){ /* proceed logged out — login screen will show */ }
   }
 
-  state.lang = settings.defaultLanguage || state.lang;
+  state.lang = savedLang() || settings.defaultLanguage || state.lang;   // the user's own choice wins over the admin's default
   r.setAttribute('lang',state.lang);
   r.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
 
